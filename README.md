@@ -178,7 +178,7 @@ The proposed 128 GB disk serves seven separate logical volumes/filesystems: Samp
 - Attach and verify the disk, mount each filesystem and prepare bindings before releasing workloads. Delayed-binding claims require consumers to schedule before binding completes.
 - Never fall back to dynamic disks or format an existing disk when recovery information is missing.
 
-This is custom storage automation, not native CSI-managed recovery. A replacement worker needs verified fencing of the old writer, disk detachment/reattachment in the same compatible availability domain, remounting and corrected PV node affinity. An external executor must handle unexpected replacement while the workstation is offline. Until those steps are implemented and rehearsed, retained-data deployment is blocked. [Kubernetes local volumes](https://kubernetes.io/docs/concepts/storage/volumes/#local)
+An external executor must recover storage after worker replacement, including when the workstation is offline. It must fence the old writer, reattach and verify the disk and mounts, then transfer the storage-owner label without changing PV affinity or claim bindings. Deployment remains blocked until the [storage recovery procedure](docs/pulumi-infrastructure-assessment.md#storage-recovery) passes testing. Kubernetes does not manage these host mounts or cloud attachments. [Kubernetes local volumes](https://kubernetes.io/docs/concepts/storage/volumes/#local)
 
 ## Deploy and bootstrap staging
 
@@ -188,8 +188,8 @@ Deployment automation must:
 2. **Provision:** reconcile durable resources, then OKE Basic, one A1 worker and network/storage prerequisites. Verify the node, mounts and policy enforcement before application reconciliation.
 3. **Recover first:** if data already exists, restore credentials, trust material, initialization markers and claim mappings before operators or bootstrap Jobs start. Missing recovery material must stop deployment.
 4. **Bootstrap Argo CD:** fetch installation values and bootstrap manifests from the selected GitOps snapshot. Install the pinned chart, health checks, restricted default project, bootstrap project and staging root.
-5. **Sync explicitly:** request a full root sync through authenticated automation. Roots do not auto-sync. Preserve hooks and propagation of the resolved commit SHA to children. Keep production disabled.
-6. **Accept and checkpoint:** wait for platform and application readiness, securely checkpoint generated credentials, then record the successful recovery generation.
+5. **Sync:** request a full root sync through authenticated automation. Save and verify credentials in encrypted recovery storage before dependent operators, hooks or workloads use them. Preserve hooks and the resolved commit SHA in child Applications. Keep production disabled.
+6. **Verify:** wait for platform and application readiness, then mark initialization complete. After an interruption, resume from verified recovery records or stop.
 
 Follow the [GitOps bootstrap guide](https://github.com/duranserkan/DRN-Project-Argo-CD-Gitops#bootstrap-a-cluster) and [dependency order](https://github.com/duranserkan/DRN-Project-Argo-CD-Gitops/blob/master/docs/platform-operations.md#installation-dependencies). Read the versions and files at the selected release, rather than mixing branch HEAD with a release tag. Its generic default-StorageClass guidance must be adapted to the explicit local class above before using this OCI storage design.
 
@@ -305,9 +305,11 @@ Use pod descriptions and targeted logs to diagnose failures, but redact credenti
 - [x] Define OCI baseline, ownership and recovery requirements.
 - [x] Document preparation, operating checks and deployment gates.
 - [ ] Complete authorized tenancy, IAM, region, allowance and capacity preflight.
+- [ ] Define credential recovery and interrupted-initialization handling.
 - [ ] Implement pinned C# Pulumi projects, three stacks and state/secret configuration.
-- [ ] Implement storage initialization, external replacement executor and resumable lifecycle CLI.
-- [ ] Prepare the GitOps release with explicit local storage classes and ClusterIP ingress.
+- [ ] Implement and test storage initialization, automatic worker recovery and the resumable lifecycle CLI.
+- [ ] Prepare the GitOps release with explicit local storage classes, ClusterIP ingress and saved credentials before use.
+- [ ] Configure encrypted backups, retention and failure reporting. Prove restoration without the original disk.
 - [ ] Verify Arm support, policy enforcement and full-stack capacity.
 - [ ] Pass repeat deployment, pause/resume, upgrade, worker replacement, retained-data recreation and independent backup restore.
 

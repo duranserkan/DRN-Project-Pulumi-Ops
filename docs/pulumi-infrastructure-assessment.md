@@ -275,11 +275,21 @@ Proposed initial logical allocations are below. Leave space unallocated for meta
 | Data Node | 8 GiB | 24 GiB | 48 GiB |
 | Total logical allocation | 32 GiB | **50 GiB** | **100 GiB** |
 
-The lifecycle automation must attach the retained disk, verify disk and filesystem identities, mount the logical volumes and establish PV bindings before releasing workloads. Initial formatting is allowed only for a verified fresh disk and a new initialization record. An existing disk must never be reformatted because a mount or Secret is missing. Keep cloud attachment permissions in the external deployment identity. Use controlled host provisioning for mounts, without giving application pods host privileges.
+### Storage recovery
 
-Verify that the selected OKE node image and lifecycle integration support automated LVM setup and recovery. Validate planned node replacement, unexpected node replacement, pause/resume and complete cluster recreation. Fence the old writer and detach the disk before attaching it to a replacement in the same availability domain. Reconcile node affinity and mount readiness before starting database pods. A normal managed-node replacement will not perform this custom storage recovery by itself. Automated storage recovery is required before deployment acceptance.
+Verify that the selected OKE image supports automated LVM setup and recovery. Format only a verified fresh disk with a new initialization record. A missing mount or Secret never authorizes reformatting. Keep attachment permissions and host provisioning outside application pods.
 
-Choose a durable external executor for unexpected replacement. A workstation CLI cannot react while the workstation is offline. Specify event or polling triggers, restricted cloud/host authority, renewable authentication, mutual exclusion with CLI operations, retries and recovery checkpoints. Fail closed when fencing or disk identity cannot be verified. No application pod receives attachment authority. Plan replacement with one worker and no overlapping boot disks, accepting downtime and possible allocation delays. Do not create a paid surge automatically. If this lifecycle cannot stay within the available allowances, report the blocker for a separate decision. Rehearse OCI upgrades and replacement in the first milestone, not as deferred maintenance work.
+Use a stable, environment-specific storage-owner label in local PV node affinity. Only the external executor may assign it, never the node-pool template. Keep the PV selector and claim bindings unchanged when the worker name changes.
+
+Under the shared lifecycle lock:
+
+1. Fence the old writer, remove its label and confirm disk detachment. Removing a label does not stop running pods. If the worker is unreachable, confirm cloud fencing.
+2. Attach the disk to the replacement in the same availability domain. Verify disk, logical-volume and filesystem identities, mounts and claim mappings.
+3. Assign the label and allow workloads to start. At most one node may carry it. Stop if ownership, fencing or mounts cannot be verified.
+
+The executor must work while the workstation is offline. Define its event or polling trigger, restricted permissions, renewable authentication, retries and saved progress. Use the same lock as the CLI. Replace the worker without overlapping boot disks or automatic paid surge, accepting downtime and allocation delays. If allowances are insufficient, stop for a separate cost decision.
+
+Before completing the lifecycle CLI, test planned and unexpected replacement, pause/resume, cluster recreation and OCI upgrades. Include a changed node name, interrupted handoff and attempted duplicate owner. Managed-node replacement alone does not recover this storage.
 
 Native OCI CSI provisioning requires 7 × 50 GB for the seven claims. That 350 GB alternative is excluded from the demo baseline. See [OKE volume provisioning](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengcreatingpersistentvolumeclaim_topic-Provisioning_PVCs_on_BV.htm).
 
@@ -331,9 +341,9 @@ The `up` sequence should perform these steps automatically:
 3. On recovery, restore the required application Secrets, initialization markers and volume bindings before starting operators or credential Jobs. If authenticated registry pulls are configured, install their Secrets before starting the consuming workloads.
 4. Install the pinned Argo CD chart with the GitOps repository's health checks. Apply the restricted default project, bootstrap project and staging root. Store UI credentials securely. Manual UI login must not be a deployment dependency.
 5. Request a full root sync through authenticated automation. The root deliberately requires an explicit sync. Do not change it to track a branch or bypass hooks.
-6. Checkpoint generated credentials into encrypted durable recovery storage as initialization progresses. Wait for child Applications, storage binding and application readiness, then mark the recovery generation complete. A failure before completion must resume from verified checkpoints or stop for recovery, never infer a fresh installation from missing cluster objects.
+6. Follow the credential recovery procedure below throughout sync. Wait for child Applications, storage binding and application readiness, then mark initialization complete.
 
-Cloud-account creation, billing consent and the initial trusted login remain prerequisites. Existing staging Jobs can continue creating application and Graylog credentials on a genuine first installation. Provision account credentials and verify domain ownership separately.
+Cloud-account creation, billing consent, the initial trusted login and domain verification remain separate prerequisites. Update the GitOps credential Jobs and operator configuration before the first deployment.
 
 **Keeping data through cluster deletion**
 
@@ -349,13 +359,31 @@ The existing bootstrap Jobs cannot distinguish a fresh cluster from retained dat
 
 Use the [credential inventory](#credentials-ownership-and-recovery) to record exact object namespace/name/key mappings, disk/LVM/filesystem identities, claim mappings and release/database versions. Regenerate transient service-account tokens through Kubernetes. Record initialization states such as uninitialized, initializing and complete with a recovery generation and verified backup references. Both existing markers record a claim, not successful completion. Graylog has no regeneration override. An interrupted first initialization may require restoration even before a deployment has ever been healthy.
 
+Prefer generating and saving credentials before deployment, then supplying them to operators that support existing Secrets. Keep recovery-store authority with the external executor. Use this procedure for initial credentials and rotations:
+
+1. Save the initialization or rotation record outside the cluster before generating credentials.
+2. Write the credentials to encrypted recovery storage, verify read-back and decryption, and save that verification outside the cluster before dependent operators, hooks or workloads use them.
+3. Reuse the verified credential generation on retries. If recovery is incomplete, stop until it is verified or a documented safe restart is possible. Never regenerate credentials against initialized data.
+
+Where an operator must generate credentials, verify that it can pause before using them so they can be saved first. Do not wait for database readiness to save credentials the database needs to start. An operator that supports neither supplied credentials nor this pause blocks deployment.
+
+Test interruptions before and after saving credentials, recording verification and starting dependent workloads. Losing the cluster after workloads start must preserve the recoverable credential identity, including after rotation.
+
 Before teardown, suspend reconciliation, stop new writes, use supported database shutdown or backup procedures and verify snapshots/backups completed. Export selected recovery objects without stale UIDs, resource versions or broken owner references. Wait for disk detachment. Remove disposable load balancers and networking while the cluster controllers can still clean up their cloud resources. Destroy bootstrap resources before the cluster, without cascading into retained data. Abort on incomplete recovery evidence.
 
 Suspend child auto-sync and operator reconciliation as needed, not merely the manually synced root. Specify namespace, Application-finalizer and CR/PVC deletion handling so bootstrap teardown cannot cascade through durable state. Use one lifecycle lock and resumable phases for up, pause, replacement and down. Before deleting a source disk during purge, name the environment, disk and recovery generation explicitly. Backup restore must be exercised separately from disk reattachment, with enough quota and a bounded cost plan for temporary restore resources.
 
-Retention is not backup. Schedule recoverable backups while the environment is active, retain their encryption keys and exercise restoration. PostgreSQL and Graylog currently have no configured backups. A retained cloud block disk is also not portable between clouds. Cross-cloud migration requires database-aware export/restore and file transfer.
+### Backups
 
-**Security and deployment prerequisites**
+Retention is not backup. PostgreSQL and Graylog currently have no configured backups. Use supported application-consistent backups or quiesced snapshots for every retained filesystem and database. Store encrypted backups outside the source disk and disposable cluster.
+
+Prefer existing backup and scheduling tools. GitOps owns in-cluster Jobs and database configuration. The lifecycle executor checks completion records stored outside the cluster before teardown. Assign responsibility for scheduling, retention and stale or failed backup alerts, including when the cluster is unavailable.
+
+Each completed backup set must record its data references, matching credential/key generations, initialization state, GitOps revision and database versions. Do not mark partial sets as recoverable. Set frequency, retention and deletion rules from the agreed RPO, RTO and cost ceiling. Keep referenced credentials and keys for as long as their backups exist.
+
+Before full-stack and lifecycle acceptance, test failure reporting and restore a completed set to a separate disk with the original unavailable. Verify test data, credential identity, recovery time and temporary-resource costs. Cross-cloud migration requires database-aware export/restore and file transfer, not disk reattachment.
+
+### Security and deployment prerequisites
 
 Use authenticated Kubernetes tunnels for Argo CD, databases and demo applications. Traefik currently serves plaintext HTTP, and its pinned chart defaults to `LoadBalancer`. Set `ClusterIP` explicitly in the GitOps release to avoid provisioning a cloud load balancer. Restrict the listener to the authorized tunnel path. Add automated DNS and trusted TLS before enabling public access. Source: [Traefik 42.0.0 values](https://raw.githubusercontent.com/traefik/traefik-helm-chart/v42.0.0/traefik/values.yaml).
 
@@ -367,26 +395,21 @@ Preflight checks must also cover the managed provider's supported Kubernetes ver
 
 Configure security updates and a maintenance window from the start. Worker replacement interrupts this single-node environment. Set the upgrade policy explicitly so temporary surge nodes and their cost are understood.
 
-**Implementation boundary and acceptance**
-
-Implement the three lifecycle stacks, CLI and durable recovery, including automatic storage recovery after worker replacement. Apply the cost policy and deployment configuration above.
-
-Acceptance requires a fresh one-command deployment, a repeat invocation without credential rotation, and a pause/resume cycle. Then write identifiable application/database data, tear down with retention, recreate the cluster and verify both data and credential identity. Missing Secrets or a mismatched disk must fail closed. Confirm that no duplicate disks, empty replacement databases or chargeable orphan load balancers remain.
-
-Capacity acceptance includes the full logging stack and startup peaks. Rehearse OCI replacement and upgrades in this milestone. Additional workers, other providers, private distribution and public DNS/TLS remain deferred.
-
 ## Ordered implementation backlog and acceptance
+
+Additional workers, other providers, private distribution and public DNS/TLS remain deferred.
 
 | Order | Work | Acceptance criteria |
 |---|---|---|
 | 1 | Record cost and recovery objectives | Paid tenancy, A1/4 OCPUs/24 GB, 128 GB data and 64 GB boot are explicit. Target verified unused free allowances. Additional billable capacity requires measured full-stack insufficiency. Record a billable-capacity ceiling, workload target, RPO and RTO. No trial-dependent pricing. |
 | 2 | Authorized OCI preflight | Confirm paid account status and A1 allowance. Record home region, existing usage, IAM/compartment, region subscription, OKE versions, shape/image options and quotas. Allocation capacity remains provisional until creation. |
 | 3 | Release prerequisites | Pin tool/provider versions and GitOps tag/SHA. Inventory every image architecture and bootstrap dependency. Resolve exact memory units. |
-| 4 | Recovery protocol | Exact encrypted inventory, independent key recovery, initialization checkpoints, lifecycle lock, backup policy and failed-initialization behavior are specified. |
+| 4 | Recovery design | Document the encrypted inventory, independent key recovery, shared lifecycle lock and operator credential support using the procedures above. |
 | 5 | Infrastructure ownership | Basic cluster is explicit. Durable disk/state/key resources survive disposable-stack deletion. Network and resource ceilings match the cost plan. |
-| 6 | Storage and external replacement executor | Seven claims bind only to their intended filesystems. No dynamic fallback, duplicate writers or reformatting. Planned and unexpected replacement recover automatically with bounded overlap. |
-| 7 | GitOps integration | Explicit local storage class and ClusterIP ingress, working policy enforcement, restored credentials before operators/hooks, full root sync and production disabled. Changes belong to the sibling GitOps repository. |
-| 8 | Full-stack acceptance | Native Arm execution, cold-start and steady-state headroom, no OOM/eviction or disk pressure under the agreed load. Applications, database TLS, logging ingestion/search and monitoring work without manual setup. |
-| 9 | Lifecycle acceptance | Repeated up, pause/resume, OCI upgrade/replacement, down/recreate and independent backup restore preserve test data and credential identity. Missing keys, wrong disks and interrupted phases fail closed. No unintended disks, load balancers or charges. |
+| 6 | Storage and external replacement executor | All seven claims bind to their intended filesystems. Pass the [storage recovery tests](#storage-recovery) before completing the CLI. |
+| 7 | GitOps integration | Configure explicit local storage classes, ClusterIP ingress, policy enforcement and full root sync with production disabled. Pass credential interruption tests for Jobs and operators. Changes belong to the sibling GitOps repository. |
+| 8 | Backups | Configure the [backup procedure](#backups) and pass failure-reporting and independent-restore tests within the agreed RPO, RTO and budget. |
+| 9 | Full-stack acceptance | Native Arm execution, cold-start and steady-state headroom, no OOM/eviction or disk pressure under the agreed load, including backup activity. Applications, database TLS, logging ingestion/search and monitoring work without manual setup. |
+| 10 | Lifecycle acceptance | Fresh one-command deployment, repeat up without credential rotation, pause/resume, OCI upgrade/replacement and down/recreate preserve identifiable test data and credential identity. Missing keys or Secrets, wrong disks and interrupted phases stop safely. No empty replacement databases, unintended disks, load balancers or charges remain. |
 
 Evidence is limited to repository inspection, official documentation, public pricing and the recorded registry-manifest checks. No builds, chart renders, runtime tests or cloud operations were run. Verify tenancy eligibility, IAM, quotas, remaining allowances and billing through authenticated inspection; validate capacity and recovery through deployment tests.

@@ -1,0 +1,107 @@
+# Adapted from DRN-Project and Argo CD GitOps for a future C# operations image.
+# Applies when the repository root is the Docker build context.
+# Exclude hidden state, credentials, Git history, agent files and CI metadata.
+**/.*
+!.editorconfig
+!.config/
+.config/*
+!.config/dotnet-tools.json
+
+# .NET build, restore, publish and test output.
+**/[Bb]in
+**/[Oo]bj
+**/[Oo]ut
+**/[Dd]ebug
+**/[Rr]elease
+**/artifacts
+**/publish
+**/[Tt]est[Rr]esults
+**/BenchmarkDotNet.Artifacts
+**/*.nupkg
+**/*.snupkg
+**/*.binlog
+**/*.trx
+**/*.coverage
+**/*.coveragexml
+**/coverage*.json
+**/coverage*.xml
+**/coverage*.info
+
+# Editor state, logs and temporary files.
+**/*.rsuser
+**/*.suo
+**/*.user
+**/*.userosscache
+**/*.userprefs
+**/*.sln.docstates
+**/*.DotSettings.user
+**/*.sln.iml
+**/*.code-workspace
+**/_ReSharper*
+**/[Ll]og
+**/[Ll]ogs
+**/*.log
+**/*.tmp
+**/*.bak
+**/*.sw?
+**/*~
+**/CLARIFY-*.md
+**/DEVELOP-*.md
+
+# Runtime settings and credentials must be supplied outside the image.
+# Keep Pulumi.yaml, but do not bake environment-specific stack settings in.
+**/Pulumi.*.yaml
+**/Pulumi.*.yml
+**/*.env
+**/*.env.*
+**/*.local
+**/*.local.json
+**/*.local.yaml
+**/*.local.yml
+**/*.pubxml
+**/*.publishsettings
+**/*.key
+**/*.keys
+**/*.priv
+**/*.rsa
+**/*.key.json
+**/*.ssh
+**/*.ssh-key
+**/*.pfx
+**/*.p12
+**/*.pem
+**/id_rsa
+**/id_ecdsa
+**/id_ed25519
+**/id_dsa
+**/oci.config
+**/oci-config*
+**/oci-session*
+**/kubeconfig
+**/kubeconfig.*
+**/*.kubeconfig
+**/*.kubeconfig.*
+
+# Reserved local directories and Pulumi exports.
+state/
+backups/
+exports/
+recovery/
+secrets/
+credentials/
+**/pulumi-state*.json
+**/pulumi-export*.json
+**/pulumi-plan*.json
+**/pulumi-outputs*.json
+trivy-results.sarif
+
+# Build definitions are not runtime payloads.
+**/Dockerfile*
+**/*.dockerignore
+**/docker-compose*
+**/compose.yaml
+**/compose.yml
+
+# Keep C# sources, project and solution files, NuGet.Config, lockfiles,
+# MSBuild inputs, deployment manifests, public CAs, README and LICENSE.
+# Do not add plaintext feed credentials to a build-visible NuGet.Config.

@@ -1,0 +1,111 @@
+# Adapted from DRN-Project and Argo CD GitOps for Pulumi with C#.
+# Ignore hidden files at every depth. Reopen shared configuration explicitly.
+.*
+!/.agent/
+!/.github/
+!/.config/
+/.config/*
+!/.config/dotnet-tools.json
+!.gitignore
+!.dockerignore
+!.gitattributes
+!.editorconfig
+!.coderabbit.yaml
+
+# Local agent workflow artifacts.
+/.agent/temp/*
+!/.agent/temp/.gitkeep
+CLARIFY-*.md
+DEVELOP-*.md
+
+# .NET build, restore, publish and test output.
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+publish/
+[Tt]est[Rr]esults/
+BenchmarkDotNet.Artifacts/
+*.nupkg
+*.snupkg
+*.binlog
+*.trx
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+coverage*.info
+
+# Editor state, logs and temporary files.
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.userprefs
+*.sln.docstates
+*.DotSettings.user
+*.sln.iml
+*.code-workspace
+_ReSharper*/
+[Ll]og/
+[Ll]ogs/
+*.log
+*.tmp
+*.bak
+*.sw?
+*~
+
+# Local environment and credential files. Examples must contain placeholders only.
+*.env
+*.env.*
+!.env.example
+*.local
+*.local.json
+*.local.yaml
+*.local.yml
+*.pubxml
+*.publishsettings
+*.key
+*.keys
+*.priv
+*.rsa
+*.key.json
+*.ssh
+*.ssh-key
+*.pfx
+*.p12
+# PEM can contain a private key. Use .crt or .cer for public certificates.
+*.pem
+id_rsa
+id_ecdsa
+id_ed25519
+id_dsa
+oci.config
+oci-config*
+oci-session*
+kubeconfig
+kubeconfig.*
+*.kubeconfig
+*.kubeconfig.*
+
+# Reserved local directories for state, credentials and recovery exports.
+# Hidden .pulumi/, .oci/, .kube/ and .ssh/ are already excluded above.
+/state/
+/backups/
+/exports/
+/recovery/
+/secrets/
+/credentials/
+pulumi-state*.json
+pulumi-export*.json
+pulumi-plan*.json
+pulumi-outputs*.json
+/trivy-results.sarif
+
+# Keep Pulumi.yaml and reviewed Pulumi.<stack>.yaml settings trackable.
+# Never put plaintext credentials in stack settings. Use a secret store or
+# Pulumi secret encryption. Export state and plans only to the local paths above.
+# Keep solution files, lockfiles, deployment scripts, manifests and public CAs.
+# Ignore rules do not protect files already tracked by Git.

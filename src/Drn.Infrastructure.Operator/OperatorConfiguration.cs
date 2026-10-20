@@ -44,7 +44,7 @@ public sealed record OperatorConfiguration
             uri.Query != "" || uri.Fragment != "" || !uri.IsDefaultPort ||
             !Regex.IsMatch(uri.AbsolutePath, "^/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:\\.git)?$", RegexOptions.CultureInvariant))
             throw new ArgumentException("gitOpsRepository must be a public HTTPS GitHub repository URL without credentials.");
-        if (!Regex.IsMatch(Infrastructure.GitOpsCommit, "^[0-9a-f]{40}$", RegexOptions.CultureInvariant))
+        if (!Regex.IsMatch(Infrastructure.GitOpsCommit, @"\A[0-9a-f]{40}\z", RegexOptions.CultureInvariant))
             throw new ArgumentException("gitOpsCommit must be the full lowercase 40-character release commit.");
         if (!InfrastructureSettings.IsGitOpsTag(Infrastructure.GitOpsTag))
             throw new ArgumentException("gitOpsTag must be a calendar release ref, for example refs/tags/2026.10.1-preview001.");

@@ -125,6 +125,10 @@ public class SettingsTests
     [DataInlineUnit("v1.36")]
     [DataInlineUnit("1.36.1")]
     [DataInlineUnit("v1.36.1-preview")]
+    [DataInlineUnit("v1.36.1\n")]
+    [DataInlineUnit("v1.36.1\r\n")]
+    [DataInlineUnit("\nv1.36.1")]
+    [DataInlineUnit("v1.36.1 ")]
     public void RejectsVersionsOutsideTheSupportedPolicyProfile(string version) =>
         Assert.Throws<ArgumentException>(() => (ValidSettings with { KubernetesVersion = version }).Validate("cluster"));
 
@@ -240,8 +244,26 @@ public class SettingsTests
     [DataInlineUnit("refs/tags/2026.13.1", false)]
     [DataInlineUnit("refs/tags/2026.10.1", true)]
     [DataInlineUnit("master", false)]
+    [DataInlineUnit("refs/tags/2026.10.1\n", false)]
+    [DataInlineUnit("refs/tags/2026.10.1-preview001\n", false)]
+    [DataInlineUnit("refs/tags/2026.10.1\r\n", false)]
+    [DataInlineUnit("\nrefs/tags/2026.10.1", false)]
+    [DataInlineUnit("refs/tags/2026.10.1 ", false)]
     public void RequiresPublishedReleaseTagShape(string tag, bool accepted) =>
         Assert.Equal(accepted, InfrastructureSettings.IsGitOpsTag(tag));
+
+    [Theory]
+    [DataInlineUnit("", "\n")]
+    [DataInlineUnit("", "\r\n")]
+    [DataInlineUnit("\n", "")]
+    [DataInlineUnit("", " ")]
+    [DataInlineUnit("", "a")]
+    public void RejectsExtraCharactersAroundGitOpsCommit(string prefix, string suffix)
+    {
+        var settings = ValidSettings with { GitOpsCommit = prefix + ValidSettings.GitOpsCommit + suffix };
+        var error = Assert.Throws<ArgumentException>(() => settings.Validate("bootstrap"));
+        Assert.StartsWith("GitOpsCommit must", error.Message);
+    }
 
     public enum BackupMappingFault { Missing, Duplicate, WrongKind, Null }
 

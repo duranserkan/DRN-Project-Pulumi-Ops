@@ -63,7 +63,7 @@ public sealed record InfrastructureSettings
         if (role is "recovery" or "durable") return;
 
         RequireOcid(NodeImageId, "image", nameof(NodeImageId));
-        if (!Regex.IsMatch(KubernetesVersion ?? "", @"^v1\.36\.\d+$", RegexOptions.CultureInvariant))
+        if (!Regex.IsMatch(KubernetesVersion ?? "", @"\Av1\.36\.\d+\z", RegexOptions.CultureInvariant))
             throw new ArgumentException("Use an exact OKE v1.36 patch with Oracle Linux 8, the supported Calico 3.32 policy profile.");
         if (ApiAllowedCidrs is not { Length: > 0 } || ApiAllowedCidrs.Any(cidr => !IsRestrictedIpv4Cidr(cidr)))
             throw new ArgumentException("ApiAllowedCidrs must contain explicit IPv4 network CIDRs with prefixes /1 through /32. World access and host bits are rejected.");
@@ -77,7 +77,7 @@ public sealed record InfrastructureSettings
             throw new ArgumentException("GitOpsRepository must be an HTTPS repository URL without embedded credentials, query or fragment.");
         if (!IsGitOpsTag(GitOpsTag))
             throw new ArgumentException("GitOpsTag must select an immutable DRN release through refs/tags/.");
-        if (!Regex.IsMatch(GitOpsCommit ?? "", "^[0-9a-f]{40}$", RegexOptions.CultureInvariant))
+        if (!Regex.IsMatch(GitOpsCommit ?? "", @"\A[0-9a-f]{40}\z", RegexOptions.CultureInvariant))
             throw new ArgumentException("GitOpsCommit must be the verified lowercase 40-character commit SHA.");
         ValidateGitOpsSnapshot(GitOpsDirectory);
         if (!Path.IsPathFullyQualified(KubeconfigPath) || !File.Exists(KubeconfigPath))
@@ -89,7 +89,7 @@ public sealed record InfrastructureSettings
     }
 
     public static bool IsGitOpsTag(string? value) => Regex.IsMatch(value ?? "",
-        @"^refs/tags/\d{4}\.(?:[1-9]|1[0-2])\.[1-9]\d*(?:-preview(?!000)\d{3})?$", RegexOptions.CultureInvariant);
+        @"\Arefs/tags/\d{4}\.(?:[1-9]|1[0-2])\.[1-9]\d*(?:-preview(?!000)\d{3})?\z", RegexOptions.CultureInvariant);
 
     private void ValidateCompute()
     {

@@ -11,6 +11,22 @@ public sealed class OperatorTests
     private const string ConfigFile = "config.json";
 
     [Theory]
+    [DataInlineUnit("", "\n")]
+    [DataInlineUnit("", "\r\n")]
+    [DataInlineUnit("\n", "")]
+    [DataInlineUnit("", " ")]
+    [DataInlineUnit("", "a")]
+    public void RejectsExtraCharactersAroundGitOpsCommit(string prefix, string suffix)
+    {
+        var config = Configuration();
+        config.Validate();
+        var invalid = config with { Infrastructure = config.Infrastructure with
+        { GitOpsCommit = prefix + config.Infrastructure.GitOpsCommit + suffix } };
+        var error = Assert.Throws<ArgumentException>(() => invalid.Validate());
+        Assert.StartsWith("gitOpsCommit must", error.Message);
+    }
+
+    [Theory]
     [DataInlineUnit("durable")]
     [DataInlineUnit("cluster")]
     [DataInlineUnit("bootstrap")]

@@ -13,6 +13,13 @@
 [![Oracle Cloud Infrastructure Documentation](https://img.shields.io/badge/Doc-OCI_Documentation-F80000)](https://docs.oracle.com/en-us/iaas/Content/home.htm)
 [![Awesome Oracle Cloud Free Tier](https://img.shields.io/badge/Doc-Awesome_Oracle_Cloud_Free_Tier-F80000)](https://github.com/neitsab/awesome-oracle-cloud-free-tier)
 
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=duranserkan_DRN-Project-Pulumi-Ops&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=duranserkan_DRN-Project-Pulumi-Ops)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=duranserkan_DRN-Project-Pulumi-Ops&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=duranserkan_DRN-Project-Pulumi-Ops)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=duranserkan_DRN-Project-Pulumi-Ops&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=duranserkan_DRN-Project-Pulumi-Ops)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=duranserkan_DRN-Project-Pulumi-Ops&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=duranserkan_DRN-Project-Pulumi-Ops)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=duranserkan_DRN-Project-Pulumi-Ops&metric=bugs)](https://sonarcloud.io/summary/new_code?id=duranserkan_DRN-Project-Pulumi-Ops)
+[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=duranserkan_DRN-Project-Pulumi-Ops&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=duranserkan_DRN-Project-Pulumi-Ops)
+
 Oracle Cloud infrastructure for [DRN-Project](https://github.com/duranserkan/DRN-Project), using Pulumi with C# and Oracle Kubernetes Engine (OKE). The staging infrastructure prepares Sample, Nexus and the full platform stack for [Argo CD GitOps](https://github.com/duranserkan/DRN-Project-Argo-CD-Gitops).
 
 [Quick start](#quick-start) | [Architecture](#architecture-and-ownership) | [Configuration](#baseline-and-cost) | [Management](#manage-staging) | [Guides](#documentation) | [Roadmap](#implementation-roadmap)

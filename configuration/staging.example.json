@@ -1,0 +1,45 @@
+{
+  "organization": "<pulumi-account>",
+  "recoveryKeyPath": "/absolute/private/path/staging-recovery.key",
+  "recoveryKeyBackedUp": false,
+  "backupRetentionCount": 7,
+  "maximumBackupAgeHours": 26,
+  "infrastructure": {
+    "region": "<oci-region-id>",
+    "availabilityDomain": "<tenancy-availability-domain-name>",
+    "clusterCompartmentId": "<cluster-compartment-ocid>",
+    "durableCompartmentId": "<durable-compartment-ocid>",
+    "kubernetesVersion": "<supported-v1.36.patch>",
+    "nodeImageId": "<oracle-linux-8-arm-oke-image-ocid>",
+    "apiAllowedCidrs": ["<operator-public-ip>/32"],
+    "ociProfile": "DRN-STAGING",
+    "ociAuth": "SecurityToken",
+    "objectStorageNamespace": "<oci-object-storage-namespace>",
+    "recoveryBucketName": "<unique-private-recovery-bucket>",
+    "allowBillableStorage": false,
+    "workers": 1,
+    "faultDomains": [],
+    "nodeShape": "VM.Standard.A1.Flex",
+    "nodeOcpus": 4,
+    "nodeMemoryInGbs": 24,
+    "bootVolumeSizeInGbs": 64,
+    "maxPodsPerNode": 93,
+    "storageGenerations": [
+      {
+        "id": "initial",
+        "volumes": {
+          "sample": { "sizeInGbs": 50, "performance": "balanced" },
+          "nexus": { "sizeInGbs": 50, "performance": "balanced" },
+          "postgresql": { "sizeInGbs": 50, "performance": "balanced" },
+          "mongodb-data": { "sizeInGbs": 50, "performance": "balanced" },
+          "mongodb-logs": { "sizeInGbs": 50, "performance": "balanced" },
+          "graylog": { "sizeInGbs": 50, "performance": "balanced" },
+          "datanode": { "sizeInGbs": 50, "performance": "balanced" }
+        }
+      }
+    ],
+    "gitOpsRepository": "https://github.com/duranserkan/DRN-Project-Argo-CD-Gitops.git",
+    "gitOpsTag": "refs/tags/<YYYY.M.sequence-previewNNN>",
+    "gitOpsCommit": "<verified-40-character-lowercase-commit-sha>"
+  }
+}

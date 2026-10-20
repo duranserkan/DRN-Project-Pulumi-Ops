@@ -1,35 +1,35 @@
 # Pulumi infrastructure assessment for the DRN demo
 
-18 October 2026. Architecture proposal. No infrastructure has been provisioned.
+19 October 2026. Architecture assessment and implementation contract. Source is implemented in part. Earlier baseline Release builds and unit tests passed. The configurable infrastructure changes have not been built or tested. No infrastructure has been provisioned.
 
 **Current delivery scope.** First deploy the existing DRN-Project applications and the DRN-Project-Argo-CD-Gitops repository through Pulumi. Use their current Docker Hub images and public NuGet dependencies. Keep the existing digest pins and bootstrap behavior. Private projects, private package feeds, registry migration and boilerplate generation are deferred until deployment and recovery work. Private image distribution will be evaluated after deployment and recovery pass acceptance.
 
 Use **Pulumi with C#** to deploy OKE Basic in the OCI home region. The allocation is listed below. Keep region identifiers in private configuration and verify tenancy-specific availability domains, A1 support, images and capacity during preflight. The first milestone is one-command deployment, healthy applications, retained-data teardown and cluster recreation. See [Oracle regions](https://docs.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm) and [OKE prerequisites](https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengprerequisites.htm).
 
-**Cost policy.** Target the paid tenancy’s verified unused A1 and storage allowances. Account upgrade and billing consent are operator prerequisites. Excess usage and services outside allowances can incur charges. Consider additional billable capacity only when measurements show the full stack does not fit; record the bottleneck, smallest sufficient increase and expected cost. Keep logging enabled. Failed eligibility or unavailable A1 capacity blocks deployment; do not substitute another region, shape or provider automatically.
+**Current storage decision.** The implementation defaults to seven 50 GB native OCI CSI volumes and one 64 GB boot disk, totaling **414 GB**. Worker count, boot size and initial per-claim sizes and performance tiers are configurable. Recorded data-volume profiles remain fixed across normal lifecycle operations. This supersedes the shared 128 GB LVM proposal. The approved tradeoff accepts billable storage to avoid custom host formatting, mounts, fencing and recovery machinery. Private configuration must acknowledge it with `allowBillableStorage: true`. The compact-storage and other-cloud comparisons below remain historical alternatives, not supported runtime profiles.
 
-Oracle authentication and the target compartment remain unresolved; the Pulumi project and lifecycle CLI are not implemented. During preflight, use [OCI session authentication](https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/clitoken.htm) to inspect account type, home region, consumption, node-pool options, Arm images, Kubernetes versions and limits. See [OKE shape and image discovery](https://docs.oracle.com/en-us/iaas/Content/ContEng/Reference/contengimagesshapes.htm).
+**Cost policy.** Target the paid tenancy's verified unused A1 allowance and account for the explicit CSI storage excess. Account upgrade and billing consent are operator prerequisites. Beyond this storage baseline, additional billable capacity needs evidence of the smallest sufficient increase and its cost. Keep logging enabled. Failed eligibility or unavailable A1 capacity blocks deployment; do not substitute another region, shape or provider automatically.
 
-OCI requires host automation to divide the retained disk into application volumes. If storage recovery proves unsuitable, revisit the design. The GCP, AWS, Azure and paid OCI comparisons are historical alternatives. The 64 GB data and lean profiles remain deferred; the 350 GB native allocation is excluded.
+The .NET stacks and operator now implement credential checkpoints, shared coordination, staged activation, policy checks, native backups and independent restore. Local unit tests cover simulated lifecycle operations. Operator account values and live permissions still require preflight. Use [OCI session authentication](https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/clitoken.htm) to inspect account type, home region, consumption, node-pool options, images matching the selected architecture, Kubernetes versions and limits. See [OKE shape and image discovery](https://docs.oracle.com/en-us/iaas/Content/ContEng/Reference/contengimagesshapes.htm).
 
 Keep the full stack, including Graylog, MongoDB and Data Node. Validate startup, steady-state load and maintenance peaks before accepting capacity.
 
-Record provider memory units, actual node capacity and Kubernetes allocatable bytes before comparing them with GiB requests. A single worker requires maintenance downtime and cannot provide application high availability. Define the billable-capacity ceiling, recovery time objective (RTO) and recovery point objective (RPO) before implementation.
+Record provider memory units, actual node capacity and Kubernetes allocatable bytes before comparing them with GiB requests. A single worker requires maintenance downtime and cannot provide application high availability. Define the billable-capacity ceiling before provisioning and the recovery time objective (RTO) and recovery point objective (RPO) before workload activation.
 
 **Free allowance and paid excess, reviewed 18 October 2026**
 
-| Resource | Proposed allocation | Free coverage when eligible | Planned paid allocation |
+| Resource | Implemented allocation | Free coverage when eligible | Paid exposure |
 |---|---|---|---|
 | OKE Basic | One cluster | No management fee | None |
 | A1 worker CPU | 4 OCPUs / 4 Arm cores | Within the paid-tenancy A1 monthly allowance | None |
 | A1 worker RAM | 24 GB | Within the paid-tenancy A1 monthly allowance | None |
-| Retained data volume | 128 GB | Shared 200 GB boot/block allowance | None |
-| Separate boot volume | 64 GB | Shared allowance, 192 GB combined | None |
+| Retained data volumes | 7 × 50 GB | Shared 200 GB boot/block allowance | Storage exceeds the allowance |
+| Separate boot volume | 64 GB | Shared allowance, 414 GB combined | At least 214 GB beyond the combined allowance |
 
 Free coverage depends on account eligibility and unused allowances. Include ancillary services in the total bill.
 
 - Oracle's price list gives paid tenancies 3,000 OCPU-hours and 18,000 GB-hours per month for A1, shared across A1 compute usage. Its Always Free guide lists the smaller 1,500 OCPU-hour and 9,000 GB-hour allowance for free tenancies, which does not cover this configuration continuously. Confirm paid account status, actual entitlement and other A1 consumption before deployment. Neither allowance covers A2 or A4. Sources: [OCI price list](https://www.oracle.com/cloud/price-list/), [Always Free](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm).
-- The documented storage allowance is 200 GB combined boot/block storage in the home region, with five volume backups. The selected 192 GB leaves 8 GB before other tenancy volumes. An overlapping replacement boot disk raises this to 256 GB. Backups, restore clones and existing resources need their own inventory.
+- The documented storage allowance is 200 GB combined boot/block storage in the home region, with five volume backups. The selected 414 GB exceeds it by 214 GB before other tenancy volumes. An overlapping replacement boot disk would raise allocation to 478 GB. Backups, restore clones and existing resources need their own inventory.
 - At 730 hours, the proposed A1 worker uses 2,920 OCPU-hours and 17,520 GB-hours, within the published paid-tenancy allowances if unused. At 744 hours, it uses 2,976 OCPU-hours and 17,856 GB-hours, leaving only 24 OCPU-hours and 144 GB-hours for other A1 usage. Replacement overlap must fit that remaining allowance too.
 - Preflight must itemize active compute, retained disks, backup retention, state/recovery storage, networking, public endpoints, transfer and deployment tooling. Specify OKE Basic explicitly. Reject unplanned enhanced features or resource growth. Use quotas and lifecycle checks where supported. Budget alerts are notification, not a hard spending cap.
 
@@ -53,15 +53,15 @@ Populate the following deployment configuration during preflight. Values in angl
 | Cluster | OKE Basic; `<cluster-name>` and `<cluster-ocid>` recorded after creation |
 | Worker | One `VM.Standard.A1.Flex`, 4 OCPUs / 4 Arm cores, 24 GB RAM |
 | Kubernetes / image | `<supported-kubernetes-version>` and `<arm-oke-image-ocid>` from regional node-pool options |
-| Data / boot disks | 128 GB retained / 64 GB disposable; record volume OCIDs separately |
-| Storage placement | Retained disk and replacement worker in the same compatible availability domain |
+| Data / boot disks | Seven 50 GB retained volumes / 64 GB disposable boot; record every volume OCID |
+| Storage placement | Retained volumes and replacement worker in the same compatible availability domain |
 | Application access | Authenticated tunnels and explicit ClusterIP ingress; no public application load balancer |
 
 Region names and identifiers come from [Oracle's region list](https://docs.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm). The exact availability-domain name, supported image, quota and available capacity require authenticated inspection. If the home region differs, report the free-eligibility blocker rather than silently changing region or incurring charges.
 
 ### Private deployment configuration
 
-These identifiers are not authentication secrets, but they describe the account and deployment. Store actual values in access-controlled deployment configuration outside public documentation. The future CLI must validate that all references belong to the intended tenancy, region and environment before mutation.
+These identifiers are not authentication secrets, but they describe the account and deployment. The implemented input is private `.local/staging.json`, based on [the example](../configuration/staging.example.json) and [field guidance](setup.md#state-secrets-and-stack-configuration). The CLI validates input shape and stack roles. Live tenancy, entitlement and permission checks remain preflight responsibilities. Bootstrap checks that durable and cluster stack outputs match the configured region and availability domain.
 
 | Required field | Placeholder / purpose |
 |---|---|
@@ -75,7 +75,7 @@ These identifiers are not authentication secrets, but they describe the account 
 | Recovery store | `<encrypted-recovery-location>`, `<encryption-key-reference>`, `<recovery-generation>` |
 | GitOps release | Repository URL, immutable release tag and resolved commit SHA |
 | Replacement executor | `<executor-identity>`, `<trigger>`, credential-renewal method and lifecycle-lock location |
-| Resource inventory | Cluster, node-pool, instance, volume and attachment OCIDs; filesystem/LVM identities and exact PV/PVC mappings |
+| Resource inventory | Cluster, node-pool, instance, volume and attachment OCIDs, CSI handles and exact PV/PVC mappings |
 
 Do not place passwords, tokens, private keys, session-token contents or embedded kubeconfig credentials in these fields. A key reference identifies where authorized automation obtains a secret; it is not the secret value.
 
@@ -85,25 +85,29 @@ Do not place passwords, tokens, private keys, session-token contents or embedded
 |---|---|---|
 | Oracle console login and MFA recovery | Account owner / identity administrator | Approved password manager or identity system. Never passed into Pulumi as application configuration. |
 | Interactive OCI session token and associated private key | Authorized operator through browser-based OCI session login | Protected local OCI profile files. Configure the intended profile and `SecurityToken` explicitly. Renew expired sessions; do not commit or copy tokens into recovery archives. |
-| Unattended executor identity | Infrastructure operator; authentication mechanism still to be selected | Restricted, renewable credentials outside the disposable cluster. Record issuer, permissions, expiry, rotation and revocation procedure before implementing automatic replacement. |
+| Unattended executor identity | External protected runner using OCI InstancePrincipal | Restricted IAM and Pulumi backend access outside the disposable cluster. Record permissions, availability monitoring and revocation procedure before enabling its workflow. |
 | Pulumi backend access | Infrastructure operator | Credential store appropriate to the chosen backend. Keep access available after cluster teardown. |
 | Pulumi state encryption / recovery decryption authority | Infrastructure operator | Independently recoverable encrypted key store. Losing the cluster must not remove the only decryption key or access path. |
 | Kubernetes access configuration | Infrastructure deployment process | Protected operator/executor configuration with scoped authorization. Regenerate cluster-specific access after recreation; do not archive transient service-account tokens as durable identities. |
 | Argo CD administrator / automation credentials | Bootstrap process | Encrypted external store with restricted access. Record rotation and recreation behavior. Never require manual UI login for deployment. |
-| Sample / Nexus settings, seeds and keys | Existing staging bootstrap on genuine first initialization | Encrypted durable checkpoints and recovery inventory; restore before credential Jobs and workloads. Preserve existing identity on repeat deployment. |
+| Sample / Nexus settings, seeds and keys | Pulumi Ops credential checkpoint in the OCI profile | Encrypted durable checkpoints and recovery inventory; restore before credential Jobs and workloads. Preserve existing identity on repeat deployment. |
 | PostgreSQL authentication and required TLS material | Database operator / designated recovery owner | Exact Secret names and required keys recorded in the private inventory. Restore consistently with retained database files before operator initialization. |
-| MongoDB operator authentication, Graylog credentials and shared trust-root material | Existing operators and bootstrap, with infrastructure recovery ownership | Preserve exact credential relationships and private trust material. Restore before logging operators/hooks. Never generate replacements against retained data. |
+| MongoDB operator authentication, Graylog credentials and shared trust-root material | Pulumi Ops supplies stable identities; operators own derived leaves | Preserve exact credential relationships and private trust material. Restore before logging operators/hooks. Never generate replacements against retained data. |
 | Initialization markers | Existing application and Graylog bootstrap Jobs | Back up both ConfigMaps with credential checkpoints. They record an initialization claim, not completion. |
 | Sealed Secrets private keys, if used | Sealed Secrets controller / recovery owner | Encrypted external backup restored before sealed resources are reconciled. |
 | Registry and private-feed credentials | None required for the current public-dependency milestone | Deferred. Do not introduce tokens or paid subscriptions as initial prerequisites. |
 
 For every durable secret, record its store reference, owner, consuming service, expiry if applicable, last rotation, backup generation and restore order. Actual secret values remain in the encrypted store. Do not print them in CLI arguments, logs, diagnostics or documentation. Limit export permissions to the named recovery inventory.
 
-Interactive authentication follows [OCI session authentication](https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/clitoken.htm). Configure the provider according to [Pulumi OCI authentication](https://www.pulumi.com/registry/packages/oci@4.x/api-docs/provider/). Browser login does not establish an unattended authentication design. Exact IAM policies and the external executor's credential mechanism remain implementation prerequisites.
+Interactive authentication follows [OCI session authentication](https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/clitoken.htm). Configure the provider according to [Pulumi OCI authentication](https://www.pulumi.com/registry/packages/oci/api-docs/provider/). Browser login does not establish an unattended authentication design. Exact IAM policies and the external executor's credential mechanism remain deployment prerequisites.
 
 Before deployment acceptance, populate the private identifiers through authorized setup, verify least-privilege access, record credential ownership and demonstrate recovery without the old cluster. Before teardown, verify that the recovery inventory and its independent decryption path are usable. Missing or inconsistent records block teardown or restoration.
 
 Keep cloud teardown authority outside Argo CD and use short-lived deployment credentials. Measure the full stack before paying for premium IOPS or larger hardware.
+
+## Historical cloud and compact-storage comparisons
+
+The comparisons through the deferred LVM allocation table record earlier alternatives. Their prices and compact-storage assumptions do not describe the implemented 414 GB native CSI baseline. They are retained for future evaluation, not as current deployment instructions.
 
 **Closest modern configuration on each cloud**
 
@@ -216,7 +220,7 @@ These eleven images do not require rebuilding just to obtain an Arm variant. Man
 
 Build a release-specific inventory of every image, including chart defaults, init containers, Dex, Redis, Prometheus, trust packages and SDK bootstraps. Record index and Arm manifest digests. The sibling repository documents Kubernetes 1.36.4 as its baseline while explicitly leaving runtime compatibility unverified. For OKE 1.35 and later, select supported OL8 images with cgroups v2 enabled. Verify the exact image/Kubernetes pair through node-pool options. See [GitOps dependency evidence](https://github.com/duranserkan/DRN-Project-Argo-CD-Gitops/blob/master/docs/platform-operations.md#dependency-review-2026-10-17) and [OKE image requirements](https://docs.oracle.com/en-us/iaas/Content/ContEng/Reference/contengimagesshapes.htm).
 
-Verify A1 availability and a compatible Arm OKE image for the selected tenancy, region and Kubernetes version through an automated node-pool-options check. See [OKE image and shape requirements](https://docs.oracle.com/en-us/iaas/Content/ContEng/Reference/contengimagesshapes.htm).
+Verify the selected Flex shape and a compatible OKE image for the selected tenancy, AD, architecture and Kubernetes version. Automated preflight checks node-pool options, shape resource and VNIC limits, image size and shape constraints, and explicit fault domains. A1 remains the default. See [OKE image and shape requirements](https://docs.oracle.com/en-us/iaas/Content/ContEng/Reference/contengimagesshapes.htm).
 
 Accept Arm only after the full stack starts, remains within memory limits and passes the retained-data recovery scenario. A later Arm-to-x86 change needs a replacement node pool and a database-supported migration or restore procedure. Do not assume raw database files are portable between architectures. See [OKE Arm node guidance](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengrunningarmnodes.htm).
 
@@ -241,11 +245,11 @@ The four-vCPU N4D limit is eight Hyperdisk attachments. Seven application disks 
 
 **Fewer active hours can save more than smaller hardware.** As a planning scenario, 120 worker-hours per month with all proposed SSDs retained for the full month would cost approximately $18.67 for A4 8/12, $15.36 for A4 4/12, $25.44 for E6 8/12 or $44.59 for GKE 8/12 with the management credit. These are monthly infrastructure estimates, before the same exclusions. They assume automation actually removes billable worker compute outside demo hours. Stopping application pods alone saves no VM charges. Budget boot storage conservatively even when worker deletion removes it.
 
-**Demo storage: 128 GB recommended, 64 GB compact**
+### Deferred compact-storage profile
 
-These sizes describe total application data capacity. Keep the node's 64 GB boot disk separate so node replacement cannot delete application data. The repository currently requests 32 GiB across seven claims. The 128 GB recommendation provides more room for logs, database maintenance and growth. It is a sizing judgment, not a measured retention guarantee. Source: [storage and database operations](https://github.com/duranserkan/DRN-Project-Argo-CD-Gitops/blob/master/docs/platform-operations.md#application-persistent-storage).
+The earlier proposal compared 128 GB and 64 GB shared application disks with a separate 64 GB boot disk. The base GitOps claims request 32 GiB in total. The proposed 128 GB allocation allowed more room for logs, maintenance and growth, but required a custom recovery system. Neither shared-disk profile is implemented. Source: [storage and database operations](https://github.com/duranserkan/DRN-Project-Argo-CD-Gitops/blob/master/docs/platform-operations.md#application-persistent-storage).
 
-| Historical A4 cost comparison, before allowances | Compact (deferred) | Selected data size |
+| Historical A4 cost comparison, before allowances | Compact (deferred) | Former recommendation (deferred) |
 |---|---:|---:|
 | Persistent data disk | 64 GB | 128 GB |
 | Separate boot disk | 64 GB | 64 GB |
@@ -256,7 +260,7 @@ These sizes describe total application data capacity. Keep the node's 64 GB boot
 
 The extra 64 GB costs $2.72/month and doubles the disk's capacity-based Balanced performance allowance. Both choices retain the full stack. Set log retention, journal/index limits and free-space alerts. Keep backups outside this disk. The prices use the same rates and exclusions as the other tables.
 
-**Oracle implementation:** create one durable OCI Block Volume, attach it to the single worker, and divide it into separate Linux logical volumes with separate filesystems. Present each mounted filesystem as a static Kubernetes `local` PersistentVolume with `Retain`, node affinity and an explicit claim mapping. This preserves application boundaries while avoiding seven cloud disks. These are node-local mounts backed by a persistent cloud disk, not ephemeral instance storage. Kubernetes supports this static volume pattern, but does not manage the underlying cloud attachment or host mounts. See [Kubernetes local volumes](https://kubernetes.io/docs/concepts/storage/volumes/#local).
+**Deferred design:** one durable OCI Block Volume would be divided into Linux logical volumes with separate filesystems and static Kubernetes `local` PersistentVolumes. This preserves application boundaries while avoiding seven cloud disks. Kubernetes does not manage the underlying cloud attachment or host mounts, so the design needs its own initialization and recovery executor. See [Kubernetes local volumes](https://kubernetes.io/docs/concepts/storage/volumes/#local).
 
 For the seven fixed claims, start with static logical volumes. An additional storage operator is not necessary for this design. Do not use a shared writable application directory or duplicate the same CSI volume handle across independent PersistentVolumes. Separate filesystems enforce capacity limits, so one application's full volume cannot consume another's allocation. All seven still share one disk's I/O and failure domain.
 
@@ -275,75 +279,55 @@ Proposed initial logical allocations are below. Leave space unallocated for meta
 | Data Node | 8 GiB | 24 GiB | 48 GiB |
 | Total logical allocation | 32 GiB | **50 GiB** | **100 GiB** |
 
-### Storage recovery
+## Storage recovery
 
-Verify that the selected OKE image supports automated LVM setup and recovery. Format only a verified fresh disk with a new initialization record. A missing mount or Secret never authorizes reformatting. Keep attachment permissions and host provisioning outside application pods.
+The current durable stack creates seven volumes with generation-owned size and performance settings, defaulting to 50 GB Balanced per claim. Bootstrap verifies per-claim size outputs and gives each volume a static CSI PV with `Retain` and the exact namespace/claim reservation in [StorageClaims.cs](../src/Drn.Pulumi/StorageClaims.cs). The `drn-retained` class has no dynamic provisioner. The OCI GitOps profile propagates it to all seven claims, so missing reservations cannot silently allocate empty replacement disks. [OKE volume provisioning](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengcreatingpersistentvolumeclaim_topic-Provisioning_PVCs_on_BV.htm)
 
-Use a stable, environment-specific storage-owner label in local PV node affinity. Only the external executor may assign it, never the node-pool template. Keep the PV selector and claim bindings unchanged when the worker name changes.
+OCI CSI manages attachment and mounts. Verify its controller identity can access the separate durable compartment. Verify the selected image supports the required attachment mode, filesystem ownership and encryption in transit. Keep the cluster and all retained volumes in the same compatible availability domain. Do not force attachment while an old writer might still run.
 
-Under the shared lifecycle lock:
+Before enabling a retained-data lifecycle:
 
-1. Fence the old writer, remove its label and confirm disk detachment. Removing a label does not stop running pods. If the worker is unreachable, confirm cloud fencing.
-2. Attach the disk to the replacement in the same availability domain. Verify disk, logical-volume and filesystem identities, mounts and claim mappings.
-3. Assign the label and allow workloads to start. At most one node may carry it. Stop if ownership, fencing or mounts cannot be verified.
+1. Record volume OCIDs, CSI handles, exact claim identities and the matching credential/recovery generation outside the cluster.
+2. Verify planned and unexpected worker replacement, old-writer fencing and attachment recovery while the workstation is offline.
+3. Exercise implemented shared coordination, resumable phases, credential checkpoints and verified backups across operator machines.
+4. Rehearse cluster recreation with deliberate old-claim-UID handling, restored credentials and no dynamic fallback. Test interrupted attachment, wrong volumes and attempted duplicate writers.
 
-The executor must work while the workstation is offline. Define its event or polling trigger, restricted permissions, renewable authentication, retries and saved progress. Use the same lock as the CLI. Replace the worker without overlapping boot disks or automatic paid surge, accepting downtime and allocation delays. If allowances are insufficient, stop for a separate cost decision.
+The CLI now quiesces workloads, checkpoints credentials and PostgreSQL metadata, validates detached volumes and takes complete group backups before pause/down. Bootstrap's deny window opens only after credential readback and live policy checks. Full retained-data lifecycle acceptance is still pending.
 
-Before completing the lifecycle CLI, test planned and unexpected replacement, pause/resume, cluster recreation and OCI upgrades. Include a changed node name, interrupted handoff and attempted duplicate owner. Managed-node replacement alone does not recover this storage.
-
-Native OCI CSI provisioning requires 7 × 50 GB for the seven claims. That 350 GB alternative is excluded from the demo baseline. See [OKE volume provisioning](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengcreatingpersistentvolumeclaim_topic-Provisioning_PVCs_on_BV.htm).
-
-**Simpler storage alternative:** GCP, AWS and Azure can retain separate native cloud disks totaling 64 GiB. Allocate 6, 6, 12, 8, 6, 10 and 16 GiB in the application order above. The 6 GiB floor lets Hyperdisk Balanced reach its included 3,000 IOPS. This avoids custom host storage recovery at the higher compute prices already shown.
-
-Future growth can expand the OCI disk, logical volume and filesystem. Automate and validate each layer before advertising one-command expansion. Static local PVs do not provide CSI-managed resizing automatically. Oracle supports increasing cloud disk capacity, not shrinking it. Hardware and storage expansion remain TODOs. See [volume resizing](https://docs.oracle.com/en-us/iaas/Content/Block/Tasks/resizingavolume.htm).
+No automatic volume expansion or storage migration is implemented. Plan increases, filesystem growth and claim changes together, with a separate cost decision and tested recovery. OCI volumes cannot be shrunk. See [volume resizing](https://docs.oracle.com/en-us/iaas/Content/Block/Tasks/resizingavolume.htm).
 
 The selected **24 GB is worker memory, not pod-allocatable memory**. Reserve memory for the OS and Kubernetes components, then derive workload budgets from the actual OKE node's allocatable bytes. The repository documents **5.5 GiB of requests for MongoDB, Graylog and Data Node alone**, excluding MongoDB agent/operator overhead. Startup peaks, Argo reconciliation and database maintenance must fit too. The full-stack 24 GB configuration remains unvalidated. See [Graylog capacity](https://github.com/duranserkan/DRN-Project-Argo-CD-Gitops/blob/master/docs/platform-operations.md#capacity-and-upgrades).
 
 Measure OKE allocatable memory directly. Inventory CPU, memory, pod slots and ephemeral storage for the entire release, including injected proxies, monitoring, operators, system pods and concurrent SDK bootstrap Jobs. Measure OKE cold-start peaks, steady-state usage, database maintenance and image-cache pressure on the 64 GB boot disk. Define workload volume, observation duration and required headroom before accepting a candidate. If it fails, budget the necessary OCI capacity and record the configuration change rather than removing capabilities silently.
 
-**Repository and resource ownership**
+## Repository and resource ownership
 
 Keep infrastructure in this repository. The existing [README roadmap](https://github.com/duranserkan/DRN-Project-Argo-CD-Gitops/blob/master/README.md#gitops-roadmap) already anticipates this separation. Its benefit is independent cloud permissions and lifecycle changes. Repository separation must be backed by branch protection and separate deployment identities.
 
 | Owner | Resources |
 |---|---|
-| Pulumi durable stack | Cloud disks, encrypted recovery storage, disk/filesystem and claim inventory, and encryption keys needed after teardown. |
-| Pulumi cluster stack and lifecycle CLI | Network, managed cluster, worker pool, cloud identities and provider prerequisites. For compact OCI storage, attachment and verified host volume initialization/remounting. |
-| Pulumi bootstrap stack | Argo CD installation, restricted projects, environment root and static PersistentVolume bindings. Use local PVs for compact OCI storage and native CSI PVs for the other designs. |
+| Pulumi recovery and durable stacks | Private versioned recovery bucket, encrypted external state, protected volume generations/groups and scheduled fallback backups. |
+| Pulumi cluster stack and operator CLI | VCN, security lists, managed cluster, worker pool, explicit stack orchestration and dedicated kubeconfig. IAM creation remains an administrator prerequisite. |
+| Pulumi bootstrap stack | Argo CD installation, restricted projects, root sync deny window, environment root and static native CSI PV bindings. |
 | Argo CD | Existing platform charts, operators, workload manifests and staging credential bootstrap Jobs. |
 
 Keep durable resources in a cloud project/account or resource group that cluster teardown cannot delete. Keep Pulumi state outside Kubernetes and outside the disposable stack. Pulumi Cloud is the simpler initial backend. A versioned object-storage backend is a valid alternative with separate bootstrap and key recovery.
 
-The lifecycle CLI should accept a GitOps repository URL, immutable release tag and resolved commit SHA. Fetch the Argo CD values and bootstrap manifests from that exact snapshot. Do not copy their contents into a second maintained source or require a manually prepared sibling checkout. Argo CD continues propagating the selected SHA to its children.
+The operator accepts a public GitHub repository URL, immutable release tag and resolved commit SHA. It verifies and fetches that snapshot before cloud mutations and uses its Argo CD values and bootstrap manifests. It does not require a manually prepared sibling checkout. Argo CD continues propagating the selected SHA to its children after future activation.
 
-Use C# because the GitOps repository already maintains C# bootstraps. A small, versioned CLI built with [Pulumi Automation API](https://www.pulumi.com/docs/iac/concepts/automation-api/) can coordinate the three stacks and recovery phases. Avoid a generic multi-cloud framework initially. Its CLI and runtime prerequisites must be installed or packaged. Automation API still needs the Pulumi CLI at runtime.
+The small .NET operator uses direct argument lists to coordinate the existing Pulumi, OCI, Git and kubectl CLIs. This keeps normal .NET project/test boundaries without introducing an additional automation framework. The runtime prerequisites are documented in [setup](setup.md).
 
-Pin the .NET SDK, Pulumi CLI, OCI/Kubernetes providers and bootstrap tools. Interactive OCI session authentication must configure the Pulumi provider's `SecurityToken` mode and profile explicitly because its default is `ApiKey`. The unattended executor needs a separately specified credential renewal mechanism. Protect state encryption keys and backend access independently of cluster deletion. See [Pulumi OCI authentication](https://www.pulumi.com/registry/packages/oci@4.x/api-docs/provider/).
+The .NET SDK, provider packages, Calico manifest/images and Argo CD chart are pinned in their owning source files. Record validated CLI versions during [release verification](todos/release-prerequisites.md). Interactive OCI authentication selects `SecurityToken`; the external runner can use `InstancePrincipal`. Protect recovery keys and backend access independently of cluster deletion. See [Pulumi OCI authentication](https://www.pulumi.com/registry/packages/oci/api-docs/provider/).
 
-**One-command operation**
+## Operator and activation boundaries
 
-Proposed CLI interface; not implemented.
+The [command table](deployment.md#operator-commands) covers setup, initialization, preview, staged activation, access, checks, backup, pause/resume, down and independent restore. The [README](../README.md#set-up-staging) supplies runnable commands. `up` restores credentials before consumers, verifies policy enforcement and performs the initial complete backup. Purge is not implemented.
 
-| Command | Contract |
-|---|---|
-| `drn-infra up staging --cloud oci --data-size 128` | Create or reconcile infrastructure, restore retained state when present, bootstrap Argo CD, sync the selected release and wait for readiness. The deferred compact profile would accept 64 for new installations. |
-| `drn-infra pause staging` | Quiesce writes and scale the worker pool to zero. Preserve the cluster and all durable state. Disable mechanisms that would scale it back up. |
-| `drn-infra resume staging` | Restore the single worker, reattach and remount retained storage when required, then wait for workload readiness. |
-| `drn-infra down staging --keep-data` | Verify recovery material, quiesce workloads, detach retained disks, clean disposable resources and delete the cluster. |
-| `drn-infra purge staging` | Permanently delete retained data through a separate, explicit confirmation naming the environment and resources. |
+`pause` and `down` require the recorded healthy generation and verified recovery authority. They suspend child reconciliation, export native data, shut down services and verify detachment before a complete group checkpoint. `down` removes only the recorded claims before destroying bootstrap and cluster stacks. Confirm actual scale-to-zero, boot-volume cleanup and charges in OCI before relying on cost savings. Historical GKE comparisons are not evidence for this lifecycle.
 
-Prefer pause/resume between demos only after validating OCI managed-pool scale-to-zero behavior and retained-disk recovery. Confirm boot-volume deletion and the resulting bill rather than assuming that zero application pods stops compute charges. The retained Basic control plane avoids repeated Secret restoration, but retained resources still require allowance accounting. GKE behavior in the comparison section is not evidence for this OCI lifecycle.
+The activation implementation checks the exact OCI image/network profile, restores credentials before use and proves allowed/denied pod traffic before a full staged root sync. It waits for child Applications and data readiness before application writers. Interrupted operations reuse verified generations and remain explicitly locked until the old executor is stopped. Manual gate removal or credential regeneration is not an alternative recovery path.
 
-The `up` sequence should perform these steps automatically:
-
-1. Validate identity, billing access, region, quotas, selected Kubernetes version and the immutable GitOps release. Check the selected hardware profile, SSD compatibility, attachment limits and the provider's node-count constraints. Validate the current public image digests, matching architectures and access to the public NuGet dependencies used by bootstrap Jobs. Check registry credentials only if authenticated pulls are configured.
-2. Reconcile durable resources, then create the cluster, worker and storage/network prerequisites. Wait for the Kubernetes API and selected storage mechanism. For compact OCI storage, verify disk attachment, logical volume identity and mounts before allowing workloads to start.
-3. On recovery, restore the required application Secrets, initialization markers and volume bindings before starting operators or credential Jobs. If authenticated registry pulls are configured, install their Secrets before starting the consuming workloads.
-4. Install the pinned Argo CD chart with the GitOps repository's health checks. Apply the restricted default project, bootstrap project and staging root. Store UI credentials securely. Manual UI login must not be a deployment dependency.
-5. Request a full root sync through authenticated automation. The root deliberately requires an explicit sync. Do not change it to track a branch or bypass hooks.
-6. Follow the credential recovery procedure below throughout sync. Wait for child Applications, storage binding and application readiness, then mark initialization complete.
-
-Cloud-account creation, billing consent, the initial trusted login and domain verification remain separate prerequisites. Update the GitOps credential Jobs and operator configuration before the first deployment.
+Cloud-account creation, billing consent, the initial trusted login and future domain verification remain separate prerequisites.
 
 **Keeping data through cluster deletion**
 
@@ -351,13 +335,13 @@ Use three independent protections: Pulumi `protect` on durable resources, Kubern
 
 Do not rely on `retainOnDelete` for routine teardown. It keeps the cloud resource but removes it from Pulumi state, creating an adoption problem on the next deployment. Keep the durable stack managed and destroy only the disposable stacks. See [Pulumi deletion protection](https://www.pulumi.com/docs/iac/operations/stack-management/protecting-against-undesired-changes/).
 
-Create disks in the durable stack. Bind static PersistentVolumes to the expected namespace and claim names. Use native CSI volumes where each claim has a cloud disk. For compact OCI storage, use local PVs after restoring host mounts from the recorded logical-volume and filesystem identities. Record disk ID, zone, filesystem, capacity, claim identity and recovery generation. Recreate the cluster in the compatible zone. Argo CD and operators retain ownership of their claims. Never let an unmatched recovery claim silently provision an empty replacement. GKE supports [binding existing disks](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/preexisting-pd).
+Create disks in the durable stack and bind native CSI PersistentVolumes to the expected namespace and claim names. Record volume ID, availability domain, capacity, claim identity and recovery generation. Recreate the cluster in the compatible availability domain. Argo CD and operators retain ownership of their claims. Never let an unmatched recovery claim silently provision an empty replacement.
 
 The recovery set must include application seeds and keys, PostgreSQL credentials and required certificate material, MongoDB authentication material, Graylog credentials, and both bootstrap initialization markers when logging is enabled. Preserve Sealed Secrets private keys if sealed resources are used. Record the exact GitOps revision and database versions alongside the data. Retain the application image digests required for recovery in Docker Hub. If authenticated pulls are configured, restore current pull credentials from their durable secret store rather than an expired cluster snapshot.
 
-The existing bootstrap Jobs cannot distinguish a fresh cluster from retained data whose Secrets and markers disappeared. Add an authoritative initialization record outside the cluster. Once initialized, missing recovery material must stop deployment before generation. Restore existing identities instead of using the credential-generation override. See [the current marker limitation](https://github.com/duranserkan/DRN-Project-Argo-CD-Gitops/blob/master/docs/staging-configuration.md#initialization-marker) and [Graylog recovery](https://github.com/duranserkan/DRN-Project-Argo-CD-Gitops/blob/master/docs/platform-operations.md#graylog-credentials-and-recovery).
+The OCI profile treats bootstrap Jobs as verifiers of supplied identities. The encrypted external initialization record is authoritative; missing recovery material stops deployment before generation. Restore existing identities instead of using a credential-generation override. See [initialization markers](https://github.com/duranserkan/DRN-Project-Argo-CD-Gitops/blob/master/docs/staging-configuration.md#initialization-marker) and [Graylog recovery](https://github.com/duranserkan/DRN-Project-Argo-CD-Gitops/blob/master/docs/platform-operations.md#graylog-credentials-and-recovery).
 
-Use the [credential inventory](#credentials-ownership-and-recovery) to record exact object namespace/name/key mappings, disk/LVM/filesystem identities, claim mappings and release/database versions. Regenerate transient service-account tokens through Kubernetes. Record initialization states such as uninitialized, initializing and complete with a recovery generation and verified backup references. Both existing markers record a claim, not successful completion. Graylog has no regeneration override. An interrupted first initialization may require restoration even before a deployment has ever been healthy.
+Use the [credential inventory](#credentials-ownership-and-recovery) to record exact object namespace/name/key mappings, cloud-volume and CSI identities, claim mappings and release/database versions. Regenerate transient service-account tokens through Kubernetes. Record initialization states such as uninitialized, initializing and complete with a recovery generation and verified backup references. Both existing markers record a claim, not successful completion. Graylog has no regeneration override. An interrupted first initialization may require restoration even before a deployment has ever been healthy.
 
 Prefer generating and saving credentials before deployment, then supplying them to operators that support existing Secrets. Keep recovery-store authority with the external executor. Use this procedure for initial credentials and rotations:
 
@@ -375,19 +359,19 @@ Suspend child auto-sync and operator reconciliation as needed, not merely the ma
 
 ### Backups
 
-Retention is not backup. PostgreSQL and Graylog currently have no configured backups. Use supported application-consistent backups or quiesced snapshots for every retained filesystem and database. Store encrypted backups outside the source disk and disposable cluster.
+Retention is not backup. The operator exports PostgreSQL and MongoDB and creates a native OpenSearch snapshot before stopping services, terminating the worker and verifying detachment. A complete seven-volume group checkpoint then preserves those artifacts and application files outside the original disks. OCI encrypts volume backups; authenticated encrypted recovery metadata binds their identities to the credential generation and pinned release.
 
-Prefer existing backup and scheduling tools. GitOps owns in-cluster Jobs and database configuration. The lifecycle executor checks completion records stored outside the cluster before teardown. Assign responsibility for scheduling, retention and stale or failed backup alerts, including when the cluster is unavailable.
+The external operations workflow schedules complete checkpoints and checks; a native OCI daily incremental policy provides an additional seven-day crash-consistent fallback. The lifecycle executor accepts only complete records for teardown/restore. Configure runner availability and failure notifications independently of the managed cluster. Backups incur downtime; a configured schedule is not a measured recovery objective.
 
 Each completed backup set must record its data references, matching credential/key generations, initialization state, GitOps revision and database versions. Do not mark partial sets as recoverable. Set frequency, retention and deletion rules from the agreed RPO, RTO and cost ceiling. Keep referenced credentials and keys for as long as their backups exist.
 
-Before full-stack and lifecycle acceptance, test failure reporting and restore a completed set to a separate disk with the original unavailable. Verify test data, credential identity, recovery time and temporary-resource costs. Cross-cloud migration requires database-aware export/restore and file transfer, not disk reattachment.
+Before acceptance, restore a completed set to a new seven-disk generation with the original unavailable. The command requires explicit additional-storage consent and keeps the source protected, with at most three declared generations. Verify test data, credential identity, recovery time and costs. Native recovery requires compatible versions and a clone that can start from its known-good offline files; arbitrary engine corruption and cross-cloud migration need separate emergency procedures.
 
 ### Security and deployment prerequisites
 
-Use authenticated Kubernetes tunnels for Argo CD, databases and demo applications. Traefik currently serves plaintext HTTP, and its pinned chart defaults to `LoadBalancer`. Set `ClusterIP` explicitly in the GitOps release to avoid provisioning a cloud load balancer. Restrict the listener to the authorized tunnel path. Add automated DNS and trusted TLS before enabling public access. Source: [Traefik 42.0.0 values](https://raw.githubusercontent.com/traefik/traefik-helm-chart/v42.0.0/traefik/values.yaml).
+Use authenticated Kubernetes tunnels for Argo CD, databases and demo applications. The GitOps OCI profile explicitly sets Traefik to `ClusterIP`; its application listener still serves plaintext HTTP inside the tunnel. Verify there is no public application load balancer. Add automated DNS and trusted TLS before enabling public access.
 
-Restrict Kubernetes API access to authorized identities and networks. Enforce the repository's NetworkPolicies through the selected provider networking implementation. Use a dedicated least-privilege node identity and protect its metadata credentials from application pods. Private nodes with managed egress are an option. For a cheaper restricted demo, public node addresses can provide outbound access with inbound firewall access denied except required cluster traffic. Public addressing does not authorize public application or SSH access.
+Restrict Kubernetes API access to authorized identities and networks. The implemented profile uses private worker/pod subnets, native VCN pod networking, NAT/service routes and pinned Calico policy-only enforcement. Oracle's supported combination is checked before deployment; Flannel is not substituted. Use a dedicated least-privilege node identity and protect metadata credentials from application pods. Public API addressing does not authorize public application or SSH access.
 
 Select and install a compatible NetworkPolicy enforcement provider before workloads. Do not assume selecting OCI pod networking enforces the existing policies. Verify denied cross-namespace traffic and permitted DNS, control-plane and application paths. Include policy-agent overhead and Linkerd compatibility in capacity acceptance. Source: [OKE networking guidance](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengbestpractices_topic-Networking-best-practices.htm).
 
@@ -397,19 +381,19 @@ Configure security updates and a maintenance window from the start. Worker repla
 
 ## Ordered implementation backlog and acceptance
 
-Additional workers, other providers, private distribution and public DNS/TLS remain deferred.
+Multiple workers within the existing subnet budget are configurable in one AD, with automatic fault-domain placement by default. Multiple ADs, alternative storage backends, live volume resizing, other providers, shared-disk LVM, private distribution and public DNS/TLS remain deferred. The linked checklists distinguish implemented source from unexecuted acceptance work.
 
 | Order | Work | Acceptance criteria |
 |---|---|---|
-| 1 | Record cost and recovery objectives | Paid tenancy, A1/4 OCPUs/24 GB, 128 GB data and 64 GB boot are explicit. Target verified unused free allowances. Additional billable capacity requires measured full-stack insufficiency. Record a billable-capacity ceiling, workload target, RPO and RTO. No trial-dependent pricing. |
-| 2 | Authorized OCI preflight | Confirm paid account status and A1 allowance. Record home region, existing usage, IAM/compartment, region subscription, OKE versions, shape/image options and quotas. Allocation capacity remains provisional until creation. |
-| 3 | Release prerequisites | Pin tool/provider versions and GitOps tag/SHA. Inventory every image architecture and bootstrap dependency. Resolve exact memory units. |
-| 4 | Recovery design | Document the encrypted inventory, independent key recovery, shared lifecycle lock and operator credential support using the procedures above. |
-| 5 | Infrastructure ownership | Basic cluster is explicit. Durable disk/state/key resources survive disposable-stack deletion. Network and resource ceilings match the cost plan. |
-| 6 | Storage and external replacement executor | All seven claims bind to their intended filesystems. Pass the [storage recovery tests](#storage-recovery) before completing the CLI. |
-| 7 | GitOps integration | Configure explicit local storage classes, ClusterIP ingress, policy enforcement and full root sync with production disabled. Pass credential interruption tests for Jobs and operators. Changes belong to the sibling GitOps repository. |
-| 8 | Backups | Configure the [backup procedure](#backups) and pass failure-reporting and independent-restore tests within the agreed RPO, RTO and budget. |
-| 9 | Full-stack acceptance | Native Arm execution, cold-start and steady-state headroom, no OOM/eviction or disk pressure under the agreed load, including backup activity. Applications, database TLS, logging ingestion/search and monitoring work without manual setup. |
-| 10 | Lifecycle acceptance | Fresh one-command deployment, repeat up without credential rotation, pause/resume, OCI upgrade/replacement and down/recreate preserve identifiable test data and credential identity. Missing keys or Secrets, wrong disks and interrupted phases stop safely. No empty replacement databases, unintended disks, load balancers or charges remain. |
+| 1 | [Cost and recovery objectives](todos/cost-recovery-objectives.md) | Paid tenancy, A1/4 OCPUs/24 GB, seven 50 GB data volumes and 64 GB boot are explicit. Acknowledge billable CSI storage and verify remaining compute allowances. Record the cost ceiling, workload target, RPO and RTO. No trial-dependent pricing. |
+| 2 | Authorized OCI preflight | Complete the [OCI preflight checklist](todos/oci-preflight.md), including human access separation. Confirm paid account status, allowances, home region, existing usage, IAM/compartment, region subscription, OKE versions, shape/image options and quotas. Allocation capacity remains provisional until creation. |
+| 3 | [Release prerequisites](todos/release-prerequisites.md) | Pin tool/provider versions and GitOps tag/SHA. Inventory every image architecture and bootstrap dependency. Resolve exact memory units. |
+| 4 | [Credential recovery](todos/credential-recovery.md) | Exercise the implemented encrypted inventory, independent key recovery, shared lifecycle lock and supplied-credential contract. |
+| 5 | [Pulumi stacks and lifecycle CLI](todos/pulumi-lifecycle.md) | Verify the implemented Basic cluster, protected volumes, explicit stacks and guarded commands. Complete durable recovery state/key resources before retained-data lifecycle. Network and resource ceilings match the cost plan. |
+| 6 | [CSI storage and recovery coordination](todos/storage-recovery.md) | All seven claims bind to their intended cloud volumes. Complete CSI and executor access from the [account separation checklist](todos/account-separation.md). Pass the [storage recovery tests](#storage-recovery) before enabling retained-data lifecycle. |
+| 7 | [GitOps integration](todos/gitops-integration.md) | Verify CSI/ClusterIP integration, live Calico enforcement and credential interruption recovery through the guarded activation path. Keep production disabled. |
+| 8 | [Backups and independent restore](todos/backup-restore.md) | Configure the [backup procedure](#backups) and pass failure-reporting and independent-restore tests within the agreed RPO, RTO and budget. |
+| 9 | [Full-stack acceptance](todos/deployment-acceptance.md#full-stack-capacity) | Native Arm execution, cold-start and steady-state headroom, no OOM/eviction or disk pressure under the agreed load, including backup activity. Applications, database TLS, logging ingestion/search and monitoring work without manual setup. |
+| 10 | [Lifecycle acceptance](todos/deployment-acceptance.md#lifecycle) | Fresh one-command deployment, repeat up without credential rotation, pause/resume, OCI upgrade/replacement and down/recreate preserve identifiable test data and credential identity. Missing keys or Secrets, wrong disks and interrupted phases stop safely. No empty replacement databases, unintended disks, load balancers or charges remain. |
 
-Evidence is limited to repository inspection, official documentation, public pricing and the recorded registry-manifest checks. No builds, chart renders, runtime tests or cloud operations were run. Verify tenancy eligibility, IAM, quotas, remaining allowances and billing through authenticated inspection; validate capacity and recovery through deployment tests.
+Evidence includes repository inspection, official documentation, public pricing, recorded registry-manifest checks and the [local build and unit tests](todos/deployment-acceptance.md#local-verification). Chart renders, live workload tests and cloud operations remain pending. Verify tenancy eligibility, IAM, quotas, remaining allowances and billing through authenticated inspection; validate capacity and recovery through deployment tests.

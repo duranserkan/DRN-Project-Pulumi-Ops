@@ -104,7 +104,11 @@ pulumi-plan*.json
 pulumi-outputs*.json
 /trivy-results.sarif
 
-# Keep Pulumi.yaml and reviewed Pulumi.<stack>.yaml settings trackable.
+# The operator generates private identifiers and machine paths in these files.
+/.local/
+/src/Drn.Pulumi/Pulumi.staging-*.yaml
+
+# Keep Pulumi.yaml and intentional example stack settings trackable.
 # Never put plaintext credentials in stack settings. Use a secret store or
 # Pulumi secret encryption. Export state and plans only to the local paths above.
 # Keep solution files, lockfiles, deployment scripts, manifests and public CAs.

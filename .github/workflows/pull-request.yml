@@ -1,0 +1,21 @@
+# PR source executes only on hosted runners, without repository secrets.
+# Sonar analysis belongs to the develop/master callers of shared CI.
+name: pull-request
+
+on:
+  pull_request:
+    branches: [develop, master]
+
+concurrency:
+  group: pull-request-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  ci:
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/ci.yml

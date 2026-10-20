@@ -1,0 +1,243 @@
+name: Shared CI
+
+on:
+  workflow_call:
+    secrets:
+      SONAR_TOKEN:
+        description: Required for develop/master push and scheduled analysis. Never pass from PR workflows.
+        required: false
+
+permissions: {}
+
+jobs:
+  dotnet:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      TESTINGPLATFORM_TELEMETRY_OPTOUT: '1'
+      SONAR_ANALYSIS: ${{ (github.event_name == 'push' || github.event_name == 'schedule') && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require Sonar configuration for branch analysis
+        if: env.SONAR_ANALYSIS == 'true'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+        run: |
+          : "${SONAR_TOKEN:?Set the SONAR_TOKEN repository secret.}"
+          : "${SONAR_PROJECT_KEY:?Set the SONAR_PROJECT_KEY repository variable.}"
+          : "${SONAR_ORGANIZATION:?Set the SONAR_ORGANIZATION repository variable.}"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore dependencies and audit vulnerabilities
+        run: dotnet restore Drn.Pulumi.slnx --configfile NuGet.Config -p:Configuration=Release
+
+      - name: Restore pinned SonarScanner
+        if: env.SONAR_ANALYSIS == 'true'
+        run: dotnet tool restore --configfile NuGet.Config
+
+      - name: Begin Sonar analysis
+        if: env.SONAR_ANALYSIS == 'true'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+        run: >-
+          dotnet tool run dotnet-sonarscanner begin
+          /k:"$SONAR_PROJECT_KEY" /o:"$SONAR_ORGANIZATION"
+          /d:sonar.host.url="https://sonarcloud.io"
+          /d:sonar.token="$SONAR_TOKEN"
+          /d:sonar.projectBaseDir="$GITHUB_WORKSPACE"
+          /d:sonar.scanner.scanAll=true
+          /d:sonar.cs.vscoveragexml.reportsPaths="TestResults/pulumi-coverage.xml,TestResults/operator-coverage.xml"
+          /d:sonar.exclusions="**/bin/**,**/obj/**,TestResults/**,.agent/**"
+          /d:sonar.qualitygate.wait=true /d:sonar.qualitygate.timeout=600
+
+      - name: Build
+        id: build
+        run: >-
+          dotnet build Drn.Pulumi.slnx --no-restore --no-incremental --configuration Release
+          --disable-build-servers -p:UseSharedCompilation=false -p:ContinuousIntegrationBuild=true
+
+      - name: Run Pulumi unit tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: >-
+          dotnet run --project tests/Drn.Pulumi.UnitTests/Drn.Pulumi.UnitTests.csproj
+          --no-build --configuration Release --
+          --report-gh --report-gh-step-summary-sections test-results coverage
+          --coverage
+          --coverage-output-format xml --coverage-output pulumi-coverage.xml
+          --results-directory "$GITHUB_WORKSPACE/TestResults"
+
+      - name: Run infrastructure operator unit tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: >-
+          dotnet run --project tests/Drn.Infrastructure.Operator.UnitTests/Drn.Infrastructure.Operator.UnitTests.csproj
+          --no-build --configuration Release --
+          --report-gh --report-gh-step-summary-sections test-results coverage
+          --coverage
+          --coverage-output-format xml --coverage-output operator-coverage.xml
+          --results-directory "$GITHUB_WORKSPACE/TestResults"
+
+      - name: Verify both coverage reports contain source coverage
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $reports = @{
+            'pulumi-coverage.xml' = 'Drn.Pulumi.dll'
+            'operator-coverage.xml' = 'Drn.Infrastructure.Operator.dll'
+          }
+          foreach ($report in $reports.GetEnumerator()) {
+            $path = "$env:GITHUB_WORKSPACE/TestResults/$($report.Key)"
+            $query = "//module[@name='$($report.Value)' and number(@lines_covered) > 0]"
+            if (-not (Select-Xml -Path $path -XPath $query)) {
+              throw "Coverage report contains no covered $($report.Value) module."
+            }
+          }
+
+      - name: Finish Sonar analysis and wait for quality gate
+        if: env.SONAR_ANALYSIS == 'true'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: dotnet tool run dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+
+      - name: Upload coverage reports
+        if: ${{ !cancelled() && hashFiles('TestResults/*-coverage.xml') != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unit-coverage
+          path: TestResults/*-coverage.xml
+          if-no-files-found: error
+          retention-days: 14
+
+  trivy:
+    permissions:
+      contents: read
+      security-events: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Scan vulnerabilities, secrets and misconfigurations
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.76.0
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: '1'
+          severity: HIGH,CRITICAL
+          limit-severities-for-sarif: 'true'
+
+      - name: Upload Trivy results
+        if: ${{ !cancelled() && hashFiles('trivy-results.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-file-system-scan
+
+  codeql:
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: actions
+            build-mode: none
+          - language: csharp
+            build-mode: manual
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        if: matrix.language == 'csharp'
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          tools: linked
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Restore dependencies for C# analysis
+        if: matrix.language == 'csharp'
+        run: dotnet restore Drn.Pulumi.slnx --configfile NuGet.Config -p:Configuration=Release
+
+      - name: Build for C# analysis
+        if: matrix.language == 'csharp'
+        run: >-
+          dotnet build Drn.Pulumi.slnx --no-restore --no-incremental --configuration Release
+          --disable-build-servers -p:UseSharedCompilation=false -p:ContinuousIntegrationBuild=true
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          category: /language:${{ matrix.language }}
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          base-ref: ${{ github.event.pull_request.base.sha }}
+          head-ref: ${{ github.event.pull_request.head.sha }}
+
+  gatekeeper:
+    if: ${{ always() }}
+    needs: [dotnet, trivy, codeql, dependency-review]
+    permissions: {}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Verify all required jobs succeeded
+        env:
+          DOTNET_RESULT: ${{ needs.dotnet.result }}
+          TRIVY_RESULT: ${{ needs.trivy.result }}
+          CODEQL_RESULT: ${{ needs.codeql.result }}
+          DEPENDENCY_REVIEW_RESULT: ${{ needs.dependency-review.result }}
+          EXPECTED_DEPENDENCY_REVIEW_RESULT: ${{ github.event_name == 'pull_request' && 'success' || 'skipped' }}
+        run: |
+          if [ "$DOTNET_RESULT" != success ] || [ "$TRIVY_RESULT" != success ] || [ "$CODEQL_RESULT" != success ] || [ "$DEPENDENCY_REVIEW_RESULT" != "$EXPECTED_DEPENDENCY_REVIEW_RESULT" ]; then
+            echo "Required checks did not all pass."
+            echo "dotnet: $DOTNET_RESULT; trivy: $TRIVY_RESULT; codeql: $CODEQL_RESULT"
+            echo "dependency-review: $DEPENDENCY_REVIEW_RESULT (expected $EXPECTED_DEPENDENCY_REVIEW_RESULT)"
+            exit 1
+          fi
+          echo "Required checks passed."

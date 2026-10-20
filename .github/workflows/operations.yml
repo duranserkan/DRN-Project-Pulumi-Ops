@@ -1,0 +1,96 @@
+name: Staging operations
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+    - cron: '47 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Staging operation
+        type: choice
+        required: true
+        default: check
+        options: [check, status, preview, up, backup, pause, resume, down]
+      confirmation:
+        description: Enter staging only when selecting down
+        type: string
+        required: false
+
+permissions: {}
+
+concurrency:
+  group: staging-operations
+  cancel-in-progress: false
+
+jobs:
+  operate:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    permissions:
+      contents: read
+    environment: staging
+    # Provision this dedicated runner outside the managed cluster. Never share it with PR jobs.
+    runs-on: [self-hosted, linux, drn-staging]
+    timeout-minutes: 360
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      REQUESTED_OPERATION: ${{ inputs.operation }}
+      OPERATION_CONFIRMATION: ${{ inputs.confirmation }}
+      TRIGGER_SCHEDULE: ${{ github.event.schedule }}
+    steps:
+      - name: Require provisioned external configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${DRN_INFRA_CONFIGURATION:-}" in
+            /*) ;;
+            *) echo 'Provision DRN_INFRA_CONFIGURATION as an absolute private file path on this external runner.'; exit 1 ;;
+          esac
+          configuration=$(realpath -- "$DRN_INFRA_CONFIGURATION")
+          workspace=$(realpath -- "$GITHUB_WORKSPACE")
+          case "$configuration" in
+            "$workspace"|"$workspace"/*) echo 'Keep runner configuration and credentials outside the checkout.'; exit 1 ;;
+          esac
+          test -f "$configuration" && test -r "$configuration"
+
+      - name: Checkout trusted default branch revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore operator dependencies
+        run: dotnet restore src/Drn.Infrastructure.Operator/Drn.Infrastructure.Operator.csproj --configfile NuGet.Config -p:Configuration=Release
+
+      - name: Build operator
+        run: >-
+          dotnet build src/Drn.Infrastructure.Operator/Drn.Infrastructure.Operator.csproj --no-restore --configuration Release
+          --disable-build-servers -p:UseSharedCompilation=false -p:ContinuousIntegrationBuild=true
+
+      - name: Run selected operation
+        shell: bash
+        run: |
+          set -euo pipefail
+          operation="$REQUESTED_OPERATION"
+          case "$TRIGGER_SCHEDULE" in
+            '17 2 * * *') operation=backup ;;
+            '47 */6 * * *') operation=check ;;
+            '') ;;
+            *) echo 'Unknown schedule.'; exit 1 ;;
+          esac
+          arguments=()
+          case "$operation" in
+            check|status|preview|up|backup|pause|resume)
+              test -z "$OPERATION_CONFIRMATION" ;;
+            down)
+              test "$OPERATION_CONFIRMATION" = staging
+              arguments+=(--confirm staging) ;;
+            *) echo 'Unsupported operation.'; exit 1 ;;
+          esac
+          dotnet src/Drn.Infrastructure.Operator/bin/Release/net10.0/Drn.Infrastructure.Operator.dll \
+            "$operation" "$DRN_INFRA_CONFIGURATION" --yes "${arguments[@]}"

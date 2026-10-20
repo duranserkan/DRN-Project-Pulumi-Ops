@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Drn.Pulumi/Drn.Pulumi.csproj" />
+    <Project Path="src/Drn.Infrastructure.Operator/Drn.Infrastructure.Operator.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Drn.Pulumi.UnitTests/Drn.Pulumi.UnitTests.csproj" />
+    <Project Path="tests/Drn.Infrastructure.Operator.UnitTests/Drn.Infrastructure.Operator.UnitTests.csproj" />
+  </Folder>
+</Solution>

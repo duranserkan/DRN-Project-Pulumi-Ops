@@ -1,0 +1,102 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+
+reviews:
+  auto_review:
+    enabled: true
+    base_branches:
+      - ".*"
+  profile: assertive
+  review_status: true
+  review_details: false
+  poem: false
+  in_progress_fortune: false
+  enable_prompt_for_ai_agents: true
+  path_filters:
+    - "!**/bin/**"
+    - "!**/obj/**"
+    - "!**/TestResults/**"
+    - "!**/.DS_Store"
+  path_instructions:
+    - path: "src/Drn.Pulumi/**"
+      instructions: |
+        Review staging OCI infrastructure and Argo CD bootstrap ownership.
+        - Preserve the recovery, durable, cluster and bootstrap stack boundaries. Recovery state and retained volumes must remain protected when disposable infrastructure is removed.
+        - Keep native CSI volumes under the durable stack and static PVs under bootstrap, with Retain and exact namespace/claim reservations. Do not introduce dynamic provisioning fallback.
+        - Check worker placement, native pod networking, subnet capacity, API access and Calico enforcement together. Reject implicit billable storage or unsupported production and multi-AD expansion.
+        - Preserve immutable GitOps revision selection, initial sync gating, restricted AppProjects and non-cascading Application deletion.
+        - The GitOps repository owns workload manifests and charts. Review local imports and transformations against that boundary rather than duplicating upstream configuration.
+
+    - path: "src/Drn.Infrastructure.Operator/**"
+      instructions: |
+        Review the CLI as the authority for provisioning and lifecycle transitions.
+        - Keep durable, cluster and bootstrap limited to initialized pre-activation provisioning. Preserve prerequisite reads, bootstrap barriers and combined up/resume activation behavior.
+        - Verify command validation, explicit destructive-operation confirmations, cancellation and subprocess failure handling. Do not expose credentials in errors or logs.
+        - Preserve local serialization, shared lock ownership and conditional state updates. Failed resource mutations must remain recoverable, and unlock must require confirmation that the previous process stopped.
+        - Verify clean immutable GitOps snapshots, retained credential identity and release compatibility. Resume must not silently select another release or storage generation.
+        - Keep live cloud and network-policy readiness checks meaningful. Inspect every worker and cross-node behavior when multiple workers exist.
+
+    - path: "src/Drn.Infrastructure.Operator/Recovery/**"
+      instructions: |
+        Review encrypted recovery state, credential checkpoints and backup ordering.
+        - Preserve authenticated encryption, independent key recovery, private file permissions and conditional object writes. Validate state schema, deployment identity and lock ownership before mutation.
+        - Credential validation must prove certificate/private-key matching and preserve existing identities during recovery. Do not treat retained data with missing credentials as a fresh installation.
+        - Backups must freeze reconciliation and writers, capture native database exports, stop data services and confirm volume detachment before cloud checkpoints.
+        - Restore into new protected volumes, retain source disks and bind restored credentials, volume profiles and the original GitOps release to the selected checkpoint.
+        - Preserve PostgreSQL metadata restoration before reattachment, bounded polling, cancellation and retryable interrupted states. Read-only validation failures must not strand mutation locks.
+
+    - path: "tests/**"
+      instructions: |
+        Review isolated xUnit v3/Microsoft.Testing.Platform tests with DRN unit data attributes.
+        - Cover observable contracts, failure boundaries, cancellation and interrupted operations using Pulumi mocks and command fakes. These tests do not establish live OCI or CSI acceptance.
+        - Keep mutable state and temporary workspaces local to each test. Every ResourceFixture consumer must join PulumiDeploymentCollection because Pulumi callbacks are process-wide.
+        - Use Fact for simple cases and DRN unit data attributes for data-driven cases. Request DrnTestContextUnit first only when its capabilities are used.
+        - Preserve strict fake command/object-store validation, independent expected external contracts and cancellation tokens. Inject delay recorders without weakening production retry behavior.
+        - Keep Argo CD tests focused on local bootstrap transformations and lifecycle contracts. Upstream manifest quality and application behavior belong to the GitOps repository.
+
+    - path: "configuration/**"
+      instructions: |
+        Review public configuration examples against OperatorConfiguration and InfrastructureSettings.
+        - Keep credentials, recovery keys and real tenancy identifiers out of tracked examples. Private deployment values belong in ignored local configuration.
+        - Preserve explicit storage-cost acknowledgement, authentication profile selection and immutable GitOps tag/SHA requirements.
+        - Initial storage profiles must not imply later in-place resizing or retiering of retained disks. Keep defaults and documented constraints aligned with validation.
+
+    - path: ".github/workflows/**"
+      instructions: |
+        Review CI and operations workflows as separate trust boundaries.
+        - PR source must run on hosted runners through pull_request without repository secrets. Never execute PR source on the protected external operations runner.
+        - Keep SONAR_TOKEN scoped to trusted branch analysis. Shared CI owns the public Sonar identity, and both coverage reports and the quality gate must remain required for branch analysis.
+        - Preserve CodeQL analysis for C# and GitHub Actions, explicit C# builds, Trivy and dependency review. Gatekeeper must check every required job, including event-specific skips.
+        - Require immutable action SHAs with verified version comments for changed pins. Keep token permissions, timeouts, shell quoting and failure propagation explicit.
+        - Operations require the protected staging environment, external private configuration and serialized lifecycle commands. Repository pushes must not deploy infrastructure.
+
+    - path: "{README.md,docs/**}"
+      instructions: |
+        Review operator documentation against implemented commands and resource ownership.
+        - Keep setup, staged provisioning, release selection, backup and recovery examples aligned with command validation and confirmation requirements.
+        - Distinguish implemented source and isolated test results from live acceptance. Retained storage is not an independent backup, and paused or removed clusters can still incur storage costs.
+        - Keep private configuration, external runner, CodeRabbit, SonarCloud and GitHub protection prerequisites explicit. This repository has no published package release-note module.
+
+    - path: ".agent/**"
+      instructions: |
+        Review agent guidance for portability and consistency with source.
+        - Keep repository facts in the profile and generic skills reusable. Preserve workflow approval, status, helper-script and command-execution gates.
+        - Verify source maps and referenced files. Update the owning conventions when CI, storage, recovery or testing contracts change.
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "AGENTS.md"
+      - ".agent/rules/DiSCOS.md"
+      - ".agent/repository-profile.md"
+      - ".agent/skills/basic-code-review/SKILL.md"
+      - ".agent/skills/basic-security-checklist/SKILL.md"
+      - ".agent/skills/basic-git-conventions/SKILL.md"
+      - ".agent/skills/overview-github-actions/SKILL.md"
+      - ".agent/workflows/review.md"
+  learnings:
+    scope: local

@@ -20,6 +20,8 @@ jobs:
       DOTNET_CLI_TELEMETRY_OPTOUT: true
       TESTINGPLATFORM_TELEMETRY_OPTOUT: '1'
       SONAR_ANALYSIS: ${{ (github.event_name == 'push' || github.event_name == 'schedule') && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master') }}
+      SONAR_PROJECT_KEY: duranserkan_DRN-Project-Pulumi-Ops
+      SONAR_ORGANIZATION: duranserkan
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -27,16 +29,12 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Require Sonar configuration for branch analysis
+      - name: Require Sonar token for branch analysis
         if: env.SONAR_ANALYSIS == 'true'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
-          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
         run: |
           : "${SONAR_TOKEN:?Set the SONAR_TOKEN repository secret.}"
-          : "${SONAR_PROJECT_KEY:?Set the SONAR_PROJECT_KEY repository variable.}"
-          : "${SONAR_ORGANIZATION:?Set the SONAR_ORGANIZATION repository variable.}"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -54,8 +52,6 @@ jobs:
         if: env.SONAR_ANALYSIS == 'true'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
-          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
         run: >-
           dotnet tool run dotnet-sonarscanner begin
           /k:"$SONAR_PROJECT_KEY" /o:"$SONAR_ORGANIZATION"

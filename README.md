@@ -13,6 +13,13 @@
 [![Oracle Cloud Infrastructure Documentation](https://img.shields.io/badge/Doc-OCI_Documentation-F80000)](https://docs.oracle.com/en-us/iaas/Content/home.htm)
 [![Awesome Oracle Cloud Free Tier](https://img.shields.io/badge/Doc-Awesome_Oracle_Cloud_Free_Tier-F80000)](https://github.com/neitsab/awesome-oracle-cloud-free-tier)
 
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=duranserkan_DRN-Project-Pulumi-Ops&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=duranserkan_DRN-Project-Pulumi-Ops)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=duranserkan_DRN-Project-Pulumi-Ops&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=duranserkan_DRN-Project-Pulumi-Ops)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=duranserkan_DRN-Project-Pulumi-Ops&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=duranserkan_DRN-Project-Pulumi-Ops)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=duranserkan_DRN-Project-Pulumi-Ops&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=duranserkan_DRN-Project-Pulumi-Ops)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=duranserkan_DRN-Project-Pulumi-Ops&metric=bugs)](https://sonarcloud.io/summary/new_code?id=duranserkan_DRN-Project-Pulumi-Ops)
+[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=duranserkan_DRN-Project-Pulumi-Ops&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=duranserkan_DRN-Project-Pulumi-Ops)
+
 Oracle Cloud infrastructure for [DRN-Project](https://github.com/duranserkan/DRN-Project), using Pulumi with C# and Oracle Kubernetes Engine (OKE). The staging infrastructure prepares Sample, Nexus and the full platform stack for [Argo CD GitOps](https://github.com/duranserkan/DRN-Project-Argo-CD-Gitops).
 
 [Quick start](#quick-start) | [Architecture](#architecture-and-ownership) | [Configuration](#baseline-and-cost) | [Management](#manage-staging) | [Guides](#documentation) | [Roadmap](#implementation-roadmap)
@@ -166,17 +173,19 @@ Pull requests and pushes to `develop` or `master` run .NET builds, both unit-tes
 
 Each `.csproj` sets `TreatWarningsAsErrors=true`. Any exception must name its diagnostic ID and explain why it is needed.
 
-Pushes to `develop` and `master`, plus scheduled checks on those branches, run SonarCloud analysis with both coverage reports and wait for its quality gate. The scanner version is pinned in [.config/dotnet-tools.json](.config/dotnet-tools.json). Configure these repository settings before enabling branch CI:
+Pushes to `develop` and `master`, plus scheduled checks on those branches, run SonarCloud analysis with both coverage reports and wait for its quality gate. The scanner version is pinned in [.config/dotnet-tools.json](.config/dotnet-tools.json). [Shared CI](.github/workflows/ci.yml) owns the public project identity. Configure the repository secret before enabling branch CI:
 
-| Setting | GitHub location | Value |
+| Setting | Location | Value |
 |---|---|---|
 | `SONAR_TOKEN` | Actions repository secret | Token authorized to analyze this repository's SonarCloud project |
-| `SONAR_PROJECT_KEY` | Actions repository variable | Exact project key from SonarCloud |
-| `SONAR_ORGANIZATION` | Actions repository variable | Exact organization key from SonarCloud |
+| `SONAR_PROJECT_KEY` | Shared CI job environment | `duranserkan_DRN-Project-Pulumi-Ops` |
+| `SONAR_ORGANIZATION` | Shared CI job environment | `duranserkan` |
 
-Import this repository into SonarCloud, select CI-based analysis and configure `master` and `develop` branch analysis with a plan that supports it. Missing configuration or a failed quality gate fails branch CI. Pull-request callers pass no repository secrets and do not run SonarScanner. CI needs no OCI credentials and performs no deployment.
+Import this repository into SonarCloud with the identity above, select CI-based analysis and configure `master` and `develop` branch analysis with a plan that supports it. No Sonar project or organization repository variables are required. A missing token, failed analysis or failed quality gate fails branch CI. Pull-request callers pass no repository secrets and do not run SonarScanner. CI needs no OCI credentials and performs no deployment.
 
 The [shared gatekeeper](.github/workflows/ci.yml) requires .NET validation, Trivy and CodeQL success, plus dependency review on pull requests. Sonar failures propagate through the .NET job. Configure `ci / gatekeeper` as a required check after confirming the first run. Enable the dependency graph and dependency review for this repository. Require CodeQL results through GitHub code-scanning rules for alert-based merge protection, since successful analysis/upload alone does not reject alerts. Protect `develop` and `master`, including code-owner review for workflow changes.
+
+[CodeRabbit configuration](.coderabbit.yaml) enables assertive automatic reviews for PRs targeting any branch. It applies repository guidelines and focused checks for Pulumi resources, lifecycle recovery, tests, configuration and CI. Generated build and test output is excluded, and learned guidance stays local to this repository. Enable the CodeRabbit GitHub app for this repository to use these reviews.
 
 Open [Drn.Pulumi.slnx](Drn.Pulumi.slnx) for the source and tests. `Drn.Infrastructure.Operator` owns the lifecycle CLI. `Drn.Pulumi` owns resource declarations. To build and run both unit-test suites locally:
 

@@ -1,0 +1,3 @@
+name: drn-pulumi
+runtime: dotnet
+description: Protected OCI staging storage, OKE and Argo CD bootstrap for DRN-Project.
